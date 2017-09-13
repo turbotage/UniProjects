@@ -1,10 +1,9 @@
-A = importdata("CePendel1Angle.txt");
-B = A(:,1);
-C = A(:,2);
+A = importdata("CePendel1Angle.dat");
+x = A(:,1);
+y = B(:,2);
 
-B = B.';
-C = C.';
+x = x.';
+y = y.';
 
-p = polyfit(B,C,2)
-
-plot(B,C)
+p = polyfit(x,y,1)
+plot(x,y)
