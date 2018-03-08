@@ -1,1 +1,0 @@
-latex_table = latex(sym(vpa(importdata('CePendel1Angle.csv'))))
