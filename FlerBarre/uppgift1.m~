@@ -1,0 +1,48 @@
+
+
+function [nextX, nextY] = nextIteration(funcs,vars)
+	
+	f1 = diff(funcs(1),vars(1));
+	f2 = diff(funcs(1),vars(2));
+	g1 = diff(funcs(2),vars(1));
+	g2 = diff(funcs(2),vars(2));
+	
+	pos = [x_n, y_n];
+
+	f = ((atPoint(f,vars,poss)*atPoint(g2,vars,poss))
+	
+	nextX = x_n - ((atPoint(f,vars,poss)*atPoint(g2,vars,poss))-...
+		(atPoint(f2,vars,poss)*atPoint(g,vars,poss))/...
+		((atPoint(f1,vars,poss)*atPoint(g2,vars,poss))-...
+		(atPoint(f2,vars,poss)*atPoint(g1,vars,poss)))
+	
+	nextY = y_n - ((atPoint(f1,vars,poss)*atPoint(g,vars,poss))-...
+		(atPoint(f,vars,poss)*atPoint(g1,vars,poss))/...
+		((atPoint(f1,vars,poss)*atPoint(g2,vars,poss))-...
+		(atPoint(f2,vars,poss)*atPoint(g1,vars,poss))
+	
+end
+
+syms x y;
+f = @(x,y) y - sin(x) - 5;
+g= @(x,y) y.^2 + 12*x - 4;
+
+f1 = diff(f,x);
+f2 = diff(f,y);
+g1 = diff(g,x);
+g2 = diff(g,y);
+
+funcs = [f,g];
+%valx = 0;
+%valy = 0;
+%eval(subs(subs(f1,x,valx),y,valy))
+vars = [x y];
+
+
+
+function value = atPoint(f,vars,pos)
+	
+	derivative = eval(subs(subs(f,vars(1),pos(1)),vars(2),pos(2)))
+
+end
+
