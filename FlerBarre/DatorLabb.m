@@ -1,0 +1,76 @@
+
+%avkommentera de delar av koden som gör att mesher och konturer genereras.
+%Obs definitioner för Function classdef finns i separat .m fil Function.m
+
+syms x y;
+vars = [x, y];
+%((x^3*y) + (5*x*x*y*y))/(exp(x*x + y*y))
+f = @(x,y) ((x.^3.*y) + (5.*x.*x.*y.*y))./(exp(x.*x + y.*y))
+F = Function(f, [x, y]);
+
+[xx,yy] = meshgrid(-3:0.01:3);
+
+%Del 1
+%<------->
+%contour(xx,yy,F.func(xx,yy),65)
+%mesh(xx,yy,F.func(xx,yy))
+
+%<------->
+
+%Del 2
+%<----->
+f1 = @(x,y) exp(- x.^2 - y.^2).*(3.*x.^2.*y + 10.*x.*y.^2) - 2.*x.*exp(- x.^2 - y.^2).*(x.^3.*y + 5.*x.^2.*y.^2);
+f2 = @(x,y) exp(- x.^2 - y.^2).*(x.^3 + 10.*y.*x.^2) - 2.*y.*exp(- x.^2 - y.^2)*(x.^3.*y + 5.*x.^2*y.^2);
+
+%figure()
+%mesh(xx,yy,f1(xx,yy));
+%mesh(xx,yy,f2(xx,yy)); 
+%hold on;
+
+%contour(xx,yy,f1(xx,yy),[0 0],'b')
+%contour(xx,yy,f2(xx,yy),[0 0],'r')
+
+Funcs = cell(2,1);
+Funcs{1} = Function(f1,vars);
+Funcs{2} = Function(f2,vars);
+
+format LONG;
+
+root = newton(Funcs, [-1.32,0.14], 30)
+
+%<------>
+
+function root = newton(funcs,guess,iters)
+    
+    f = funcs{1};
+    g = funcs{2};
+    f1 = parDeriv(f,1);
+    f2 = parDeriv(f,2);
+    g1 = parDeriv(g,1);
+    g2 = parDeriv(g,2);
+
+    root = guess;
+    
+    i = 1;
+    while i < iters
+        nextIteration();
+        i = i + 1;
+    end
+
+    function nextIteration()
+
+        fg2 = valueOf(f,root) * valueOf(g2,root);
+        f2g = valueOf(f2,root) * valueOf(g,root);
+        f1g2 = valueOf(f1,root) * valueOf(g2,root);
+        f2g1 = valueOf(f2,root) * valueOf(g1,root);
+
+        root(1) = root(1) - ((fg2 - f2g)/(f1g2 - f2g1));
+            
+        f1g = valueOf(f1,root)*valueOf(g,root);
+        fg1 = valueOf(f,root)*valueOf(g1,root);
+
+        root(2) = root(2) - ((f1g - fg1)/(f1g2 - f2g1));
+    end
+
+end
+
