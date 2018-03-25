@@ -5,9 +5,12 @@
 syms x y;
 vars = [x, y];
 
-%(((x^3)*y) + (5*(x^2)*(y^2)))/(exp(x^2 + 3*y^4))
+%(((x^3)*y) + (5*(x^2)*(y^2)))/(exp(x.^2 + 3.*y.^4))
 f = @(x,y) (((x.^3).*y) + (5.*(x.^2).*(y.^2)))./(exp(x.^2 + 3.*y.^4));
 F = Function(f, [x, y]);
+
+f1 = diff(f,x)
+f2 = diff(f,y)
 
 [xx,yy] = meshgrid(-3:0.01:3);
 
@@ -20,11 +23,11 @@ F = Function(f, [x, y]);
 
 %Del 2
 %<----->
-f1 = @(x,y) exp(- x.^2 - 3.*y.^4).*(3.*x.^2.*y + 10.*x.*y.^2) - 2.*x.*exp(- x.^2 - 3.*y.^4)*(x.^3.*y + 5.*x.^2.*y.^2);
-f2 = @(x,y) exp(- x.^2 - 3.*y.^4).*(x.^3 + 10.*y.*x.^2) - 12.*y.^3.*exp(- x.^2 - 3.*y.^4).*(x.^3.*y + 5.*x.^2.*y.^2);
+f1 = @(x,y) exp(- x.^2 - 3.*y.^4).*(3.*x.^2.*y + 10.*x.*y.^2) - 2.*x.*exp(- x.^2 - 3.*y.^4)*(x.^3.*y + 5.*x.^2.*y.^2)
+f2 = @(x,y) exp(- x.^2 - 3.*y.^4).*(x.^3 + 10.*y.*x.^2) - 12.*y.^3.*exp(- x.^2 - 3.*y.^4).*(x.^3.*y + 5.*x.^2.*y.^2)
 
 %figure()
-%mesh(xx,yy,f1(xx,yy));
+mesh(xx,yy,f1(xx,yy));
 %mesh(xx,yy,f2(xx,yy)); 
 %hold on;
 
@@ -37,7 +40,7 @@ Funcs{2} = Function(f2,vars);
 
 format LONG;
 
-root = newton(Funcs, [1.48,-0.19], 30)
+root = newton(Funcs, [-1.32,0.14], 30)
 
 %<------>
 
