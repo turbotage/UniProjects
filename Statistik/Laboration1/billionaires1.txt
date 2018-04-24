@@ -1,0 +1,30 @@
+Argentina	72
+Australia	64.0833333333333
+Brazil	59.4117647058824
+Canada	61.1363636363636
+Chile	70.3333333333333
+China	48.85
+Colombia	78.5
+Egypt	59.6666666666667
+Hong Kong. China	65
+India	56.2941176470588
+Indonesia	62.5
+Israel	62.8888888888889
+Japan	64.8260869565217
+Kazakhstan	43.8
+Korea. Rep.	52.7
+Kuwait	61.5
+Lebanon	38.5
+Malaysia	72.5555555555556
+Mexico	62.8
+New Zealand	50
+Oman	58
+Philippines	75.3333333333333
+Saudi Arabia	58.2
+Singapore	67.5
+South Africa	64.3333333333333
+Taiwan	62.625
+Thailand	68
+United Arab Emirates	61.3333333333333
+United States	65.2746987951807
+Venezuela	51
