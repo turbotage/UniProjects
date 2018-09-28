@@ -24,7 +24,7 @@ clear all;
 clc; 
 load('randwebs.mat');
 load('randinits.mat');
-ter
+
 intmat = 1;
 
 options = odeset('NonNegative',1);
@@ -59,7 +59,7 @@ load('randinits.mat');
 
 options = odeset('NonNegative',1);
 
-tend = 9000;
+tend = 3000;
 
 interactionset_alive = zeros(1000,1);
 species_alive = zeros(11,1);
@@ -104,11 +104,7 @@ for k = 1:1000
     %}
 
 end
-% displayes a matrix over how many species that survived for each initial condition
-disp(interactionset_alive)
-% displayes how many times it occured that a specif count of species
-% survived
-disp(species_alive)
+disp(interationset_alive) % display
 
 
 %% 
@@ -129,8 +125,7 @@ species_alive = zeros(11,1);
 hasPlotted = 0;
 
 for j = 1:2
-    tend = 8000*j;
-    tspan = [0, tend];
+    tend = 5000*i;
     for k = 1:1000
 
         intmat = k;
@@ -173,7 +168,7 @@ for j = 1:2
     aliveForDifferentSolutionTimes(:,j) = interactionset_alive;
 
 end
-disp( sum(aliveForDifferentSolutionTimes(:,1) == aliveForDifferentSolutionTimes(:,2)) )
+disp( sum(aliveForDifferentSolutionTimes(:,1) & aliveForDifferentSolutionTimes(:,2)) )
 
 %% 
 %assignment9
