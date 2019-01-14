@@ -6,13 +6,14 @@ Ra=0.7;  % Radie
 La=0.4;  % Kryssets storlek
 SP = [xa,ya,za];
 
-NR = 1;
-NC = 2;
+NR = 4;
+NC = 4;
 NP = NR*NC;
 NS = 4*NR*NC - 3*NR - 3*NC + 2;
 Ks = 100;
 Kd = 0.5;
 M = ones(NP,1);
+A = 10;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Instaellningar for grafik-fonstret
@@ -36,12 +37,14 @@ lines = setup_lines_cross(R_n, springs, NR, NC);
 %balls = setup_balls(lines);
 
 % offset one particle 
-R_n(1,:) = R_n(1,:) + [0.2, 0.2, 0];
+R_n(1,:) = R_n(1,:) + [0.1, 0.1, 0.1];
+%F_n(1,:) = F_n(1,:) + [1, 1, 0]; 
+
 
 dt = 0.001;
 drawEveryN = dt*10;
 
-V_n = init_update(dt,R_n,V_n,springs,M);
+V_n = init_update(dt,R_n,V_n,F_n,springs,M);
 
 for t = 0:dt:1000
     [R_n, V_n] = update_RandV(dt,R_n,V_n,springs,M);

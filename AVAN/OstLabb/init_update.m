@@ -1,7 +1,7 @@
-function V_n = init_update(dt,R_n,V_n, springs, M)
+function V_n = init_update(dt,R_n,V_n,F_n,springs,M)
 %INIT_UPDATE Summary of this function goes here
 %   Detailed explanation goes here
-    F_n = zeros(length(R_n),3);
+    %F_n = zeros(length(R_n),3);
     for i=1:length(springs)
         r = R_n(springs(i).fromPI,:) - R_n(springs(i).toPI,:);
         d = norm(r);
