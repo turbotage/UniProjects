@@ -1,4 +1,4 @@
-function lines = draw(R_n,lines)
+function lines = draw_lines(R_n,lines)
 %DRAW Summary of this function goes here
 %   Detailed explanation goes here
     for i = 1:length(lines)

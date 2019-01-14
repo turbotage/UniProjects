@@ -1,7 +1,6 @@
-function [R_n,V_n] = update_RandV(dt,R_n,V_n, springs, M)
+function [R_n,V_n] = update_rv(dt,R_n,V_n,F_n,springs,M)
 %UPDATE Summary of this function goes here
 %   Detailed explanation goes here
-    F_n = zeros(length(R_n),3);
     for i=1:length(springs)
         r = R_n(springs(i).fromPI,:) - R_n(springs(i).toPI,:);
         d = norm(r);
