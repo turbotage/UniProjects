@@ -3,7 +3,7 @@
 % Whatch spring effects by applying changes in the perturbations section
 
 %%%%%%%%%%%%% GLOBAL DEFINITIONS %%%%%%%%%%%%%%%%%%%%%%%
-dt = 0.002;
+dt = 0.005;
 drawUpdate = dt*10;
 plotUpdate = dt*10;
 energyUpdate = dt*10;
@@ -20,15 +20,15 @@ E = zeros(length(TIMES), 1);
 SP = [1,5,1]; % Start-position (centrum)
 Ra=0.7;  % Radie
 
-NR = 10;
-NC = 4;
+NR = 4;
+NC = 8;
 NP = NR*NC;
 NS = 4*NR*NC - 3*NR - 3*NC + 2;
 Ks = 70;
 Kd = 2;
 Kf = 0.5;
 M = ones(NP,1);
-dim = 2;
+dim = 3;
 
 %%%%%%%%%%%%%%% GRAPHICS SETTINGS %%%%%%%%%%%%%%%%%%%%%%%% 
 daspect([1,1,1]);   % Skalar axlarna lika
@@ -36,7 +36,8 @@ daspect([1,1,1]);   % Skalar axlarna lika
 if dim == 3
     axis([0,10,0,10,0,3]);
 elseif dim == 2
-    axis([0,20,0,20]);
+    %axis([0,40,-20,20]);  % stairs
+    axis([0, 20, 0, 20]);
 end
 hold on;             % Laas fast dessa instaellningar
 
@@ -44,9 +45,10 @@ hold on;             % Laas fast dessa instaellningar
 % number of rows, number of cols, scale, initial translation
 %%%%%%%%%% GENERATE QUAD POSITIONS %%%%%%%
 PR_n = generate_quad(NR,NC,1,SP);
+PR_n(:,2) = PR_n(:,2) + ones(NP,1);
 %%%% INITIAL VELOCITY %%%%
 PV_n = zeros(NP,3);
-PV_n(:,1) = ones(NP,1)*2;
+PV_n(:,1) = ones(NP,1)*3;
 %%%% INITIAL FORCE %%%%%%
 PF_n = zeros(NP,3);
 
@@ -62,8 +64,8 @@ lines = setup_lines_cross(PR_n, springs, dim);
 
 
 %%%%%%%%%%% GENERATE GROUND %%%%%%%%%%%%%%
-%[BR_n, r_n] = generate_ground_stairs(8,4,10,1, [0,5,1]);
-[BR_n, r_n] = generate_ground(20,1,SP);
+[BR_n, r_n] = generate_ground_stairs(8,4,10,1, [0,5,1]);
+%[BR_n, r_n] = generate_ground(40,0.5,SP);
 ground_balls = setup_balls(BR_n, r_n, 2);
 
 
