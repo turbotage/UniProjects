@@ -1,0 +1,57 @@
+%%%%%%%%%%%% INFORMATION %%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%% GLOBAL DEFINITIONS %%%%%%%%%%%%%%%%%%%%%%%
+dt = 0.005;
+drawUpdate = 10; %update every drawUpdate:th frame
+energyUpdate = 10; %update every energyUpdate:th frame
+
+TIMES = 0:dt:2;
+
+G = -5; %gravity constant
+
+SP = [1,5,1]; % Start-position (centrum)
+
+NC = 8; %number of columns x-axis for particle system
+NR = 4; %number of rows y-axis for particle system
+NL = 1; %number of layers z-axis for particle system
+NP = NR*NC*NL; %number of particles
+NS = NL*NC*(NR-1)+NR*NC*(NL-1)+NL*NR*(NC-1)+... %straights
+     2*NL*(NR-1)*(NC-1)+2*NR*(NC-1)*(NL-1)+2*NC*(NL-1)*(NR-1)+... %2cross
+     4*(NL-1)*(NR-1)*(NC-1); %3cross
+KS = 70; %coefficient for spring-force
+KD = 2; %coefficient of spring-damping
+MASSES = ones(NP,1);
+DIM = 3; %decides how to draw, getup ground and in which direction gravity acts
+
+NX = 20; %number of balls in x-dir
+NY = 20; %number of balls in y-dir
+GROUND_SCALE = 1;
+GROUND_RADIUS=0.7;  % Radius for ground balls
+
+%%% ENERGIES %%%
+energyN = (length(TIMES)-1)/energyUpdate;
+Etimes = zeros(energyN, 1);
+Ek = zeros(energyN, 1);
+Ep = zeros(energyN, 1);
+Ef = zeros(energyN, 1);
+E = zeros(energyN, 1);
+
+%%%%%%%%%%%%%%% GRAPHICS SETTINGS %%%%%%%%%%%%%%%%%%%%%%%%
+figure(1);
+%daspect([1,1,1]);   % Skalar axlarna lika
+xlim([0, NX*GROUND_S]);
+if DIM == 2
+    
+elseif DIM == 3
+    axis([0,NX*GROUND_SCALE,0,NY*GROUND_SCALE,0,10]);
+end
+
+%%%%%%%%%%% GENERATE GROUND %%%%%%%%%%%%%%
+BR_n = generate_ground(NX,NY,GROUND_SCALE,SP,GROUND_RADIUS,DIM);
+%%% SETUP BALLS GRAPHICAL OBJECTS %%%
+
+
+
+
+

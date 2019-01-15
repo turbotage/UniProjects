@@ -1,4 +1,4 @@
-function springs = setup_springs(R_n,NR,NC, Ks, Kd)
+function springs = setup_springs(PR_n,NR,NC, Ks, Kd)
 %SETUP_SPRINGS Summary of this function goes here
 %   Detailed explanation goes here
     springs = struct([]);
@@ -12,7 +12,7 @@ function springs = setup_springs(R_n,NR,NC, Ks, Kd)
             springs(i).toPI = pi+1;
             springs(i).ks = Ks;
             springs(i).kd = Kd;
-            springs(i).L = norm(R_n(pi,:) - R_n(pi+1,:));
+            springs(i).L = norm(PR_n(pi,:) - PR_n(pi+1,:));
         end
     end
     %y-axis springs
@@ -22,7 +22,7 @@ function springs = setup_springs(R_n,NR,NC, Ks, Kd)
         springs(i).toPI = pi+NC;
         springs(i).ks = Ks;
         springs(i).kd = Kd;
-        springs(i).L = norm(R_n(pi,:) - R_n(pi+NC,:));
+        springs(i).L = norm(PR_n(pi,:) - PR_n(pi+NC,:));
     end
     % right diagonal
     for j=0:(NR-2)
@@ -33,7 +33,7 @@ function springs = setup_springs(R_n,NR,NC, Ks, Kd)
             springs(i).toPI = pi+NC+1;
             springs(i).ks = Ks;
             springs(i).kd = Kd;
-            springs(i).L = norm(R_n(pi,:) - R_n(pi+NC+1,:));
+            springs(i).L = norm(PR_n(pi,:) - PR_n(pi+NC+1,:));
         end
     end
     % left diagonal
@@ -45,7 +45,7 @@ function springs = setup_springs(R_n,NR,NC, Ks, Kd)
             springs(i).toPI = pi+NC-1;
             springs(i).ks = Ks;
             springs(i).kd = Kd;
-            springs(i).L = norm(R_n(pi,:) - R_n(pi+NC-1,:));
+            springs(i).L = norm(PR_n(pi,:) - PR_n(pi+NC-1,:));
         end
     end
 end

@@ -11,9 +11,13 @@ function balls = setup_balls(BR_n,r_n, dim)
                'Curvature', [1,1], 'EdgeColor', 'r', 'FaceColor', 'w');
         end
     elseif dim == 3
+        
         for i = 1:length(BR_n)
             balls(i).pos = i;
-            balls(i).r = r_n(i); 
+            balls(i).r = r_n(i);
+            
+            
+            
         end
     end
 end

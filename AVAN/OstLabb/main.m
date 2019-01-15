@@ -2,7 +2,7 @@
 % Global definitians
 dt = 0.001;
 drawGeomN = dt*10;
-drawPlotN = dt*10;
+calcEnergies = dt*10;
 
 TIMES = 0:dt:1000;
 
@@ -23,10 +23,11 @@ Kd = 0.5;
 M = ones(NP,1);
 dim = 2;
 
-Ek = zeros(length(TIMES), 1);
-Ep = zeros(length(TIMES), 1);
-Ef = zeros(length(TIMES), 1);
-E = zeros(length(TIMES), 1);
+energyN = length(TIMES)/calcEnergies;
+Ek = zeros(energyN, 1);
+Ep = zeros(energyN, 1);
+Ef = zeros(energyN, 1);
+E = zeros(energyN, 1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Settings for 
