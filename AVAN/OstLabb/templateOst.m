@@ -3,128 +3,169 @@
 
 %%%%%%%%%%%%% GLOBAL DEFINITIONS %%%%%%%%%%%%%%%%%%%%%%%
 %%%% GENERAL SETTINGS %%%%
-dt = 0.004;
-drawUpdate = 10; %update every drawUpdate:th frame
-energyUpdate = 10; %update every energyUpdate:th frame
+dt = 0.001;
+drawUpdate = 2; %update every drawUpdate:th frame
+energyUpdate = 1; %update every energyUpdate:th frame
 
-TIMES = 0:dt:8;
+TIMES = 0:dt:4;
 
-DIM = 3; %decides how to draw, getup ground and in which direction gravity acts
+DIM = 2; %decides how to draw, setup ground and in which direction gravity acts
 G = -5; %gravity constant
 
 %%%% PARTICLES SETTINGS %%%%
-NC = 3; %number of columns x-axis for particle system
-NR = 3; %number of rows y-axis for particle system
-NL = 4; %number of layers z-axis for particle system
+particleColumns = 7; %number of columns x-axis for particle system
+particleRows = 4; %number of rows y-axis for particle system
+particleLayers = 3; %number of layers z-axis for particle system
 if DIM == 2
-   NL = 1; 
+   particleLayers = 1;
 end
-NP = NR*NC*NL; %number of particles
-NS = NL*NC*(NR-1)+NR*NC*(NL-1)+NL*NR*(NC-1)+... %straights
-     2*NL*(NR-1)*(NC-1)+2*NR*(NC-1)*(NL-1)+2*NC*(NL-1)*(NR-1)+... %2cross
-     4*(NL-1)*(NR-1)*(NC-1); %3cross
-KS = 200; %coefficient for spring-force
-KD = 0; %coefficient of spring-damping
-PSP = [0,0,0]; %particle-start-point
-PS = 1; %particle-scale
-PM = ones(NP,1)*0.5;
+particleNumbers = particleColumns*particleRows*particleLayers; %number of particles
+particleScale = 1; %particle-scale
+particleMasses = ones(particleNumbers,1)*1;
 
-EN = (length(TIMES)-1)/energyUpdate;
-ETIMES = zeros(EN, 1);
-EKP = zeros(EN, 1);
-EPP = zeros(EN, 1);
-EFP = zeros(EN, 1);
-ETP = zeros(EN, 1);
+%%%% springs SETTINGS %%%%
+springNumbers = get_number_of_springs(particleColumns,particleRows,particleLayers);
+springKS = 200; %coefficient for spring-force
+springKD = 0; %coefficient of spring-damping
 
+%%%% ENERGY SETTINGS %%%%
+energyCalcN = floor(length(TIMES)/energyUpdate)+1;
+energyTimes = zeros(energyCalcN, 1);
+
+particleEnergyKinetic = zeros(energyCalcN, 1);
+particleEnergyPotential = zeros(energyCalcN, 1);
+particleEnergySprings = zeros(energyCalcN, 1);
+particleEnergyTotal = zeros(energyCalcN, 1);
 
 %%%% GROUND SETTINGS %%%%
-NX = 20; %number of balls in x-dir
-NY = 20; %number of balls in y-dir
-GS = 0.25; %ground-scale
-GSP = [0,0,0]; %ground-starting-point
-GBR=0.7;  % Radius for ground balls
-
-%%%%%%%%%%%%%%% GRAPHICS SETTINGS %%%%%%%%%%%%%%%%%%%%%%%%
-figure(1);
+groundNX = 0;
+groundNY = 0;
 if DIM == 2
-    axis equal; 
+    groundNX = 30;
+    groundNY = 20;
 elseif DIM == 3
-    axis([0,NX*GBR,0,NX*GBR,0,NX*GBR]);
+    groundNX = 30; %number of balls in x-dir
+    groundNY = 15; %number of balls in y-dir 
 end
+groundScale = 0.5; %ground-scale
+groundStartPoint = [0,0,0]; %ground-starting-point
+groundBallRadius=0.5;  % Radius for ground balls
 
 %%%%%%%%%%% GENERATE GROUND %%%%%%%%%%%%%%
-BR_n = generate_ground(NX,NY,GS,GSP,GBR,DIM);
+groundBallPositions = generate_ground(groundNX,groundNY,groundScale,groundStartPoint,groundBallRadius,DIM);
 %%% SETUP BALLS GRAPHICAL OBJECTS %%%
 
-%%%%%%%%%% GENERATE CUBOID POSITIONS AND SPRINGS %%%%%%%
-[PR_n, springs] = setup_cuboid(NC,NR,NL,PS);
-%%%% SETUP CUBOID LINES %%%%
-lines = setup_lines_cross(PR_n, springs, DIM);
+%%%%%%%%%% GENERATE CUBOID POSITIONS AND springs %%%%%%%
+[particlePositions, springs] = setup_cuboid(particleColumns,particleRows,particleLayers,particleScale);
+%%%% SETUP CUBOID lines %%%%
+lines = setup_lines_cross(particlePositions, springs, DIM);
 
 %%%%%%%%% PARTICLE PERTRUBATIONS %%%%%%%%
 %%%% INITIAL POSITION %%%%
+particlePositionsOld = particlePositions;
 if DIM == 2
-    PR_n(:,:) = PR_n(:,:) + [2,2,0];
+    particlePositions(:,:) = particlePositions(:,:) + [2,2,0];
 elseif DIM == 3
-    PR_n(:,3) = PR_n(:,3) + ones(NP,1)*3;
+    particlePositions(:,:) = particlePositions(:,:) + [0,0,2];
 end
 %%%% INITIAL VELOCITIES %%%%
-PV_n = zeros(NP,3);
+particleVelocities = zeros(particleNumbers,3);
+particleVelocitiesOld = particleVelocities;
 if DIM == 2
-    PV_n(:,:) = PV_n(:,:) + [3,0,0];
+    particleVelocities(:,:) = particleVelocities(:,:) + [0,0,0];
 elseif DIM == 3
-    PV_n(:,:) = PV_n(:,:) + [2,1,0];
+    particleVelocities(:,:) = particleVelocities(:,:) + [2,0,0];
+end
+%%%% INITIAL FORCES %%%%
+particleForces = zeros(particleNumbers, 3);
+
+%%%%%%%%%%%%%%% GRAPHICS SETTINGS %%%%%%%%%%%%%%%%%%%%%%%%
+%figure(1);
+if DIM == 2
+    axis equal; 
+elseif DIM == 3
+    daspect([1,1,1]);
+    axis([...
+        -5*groundBallRadius*groundScale+groundStartPoint(1),...
+        groundNX*groundScale+5*groundBallRadius*groundScale+groundStartPoint(1),...
+        -5*groundBallRadius*groundScale+groundStartPoint(2),...
+        groundNY*groundScale+5*groundBallRadius*groundScale+groundStartPoint(2),...
+        groundStartPoint(3),...
+        groundStartPoint(3)+10]...
+        );
+    xlabel('x-axis');
+    ylabel('y-axis');
+    zlabel('z-axis');
 end
 
+%%%% INITIAL ENERGY UPDATE %%%%
+particleEnergyKinetic(1) = energy_kinetic(particleVelocities, particleMasses);
+particleEnergySprings(1) = energy_springs(particlePositions,springs,springKS);
+particleEnergyPotential(1) = energy_gravity(particlePositions,particleMasses,G,DIM);
+particleEnergyTotal(1) = particleEnergyKinetic(1) + particleEnergySprings(1) + particleEnergyPotential(1);
+
 %%%% INITIAL UPDATE %%%%
-[PV_n,PF_n] = init_update(dt,PR_n,PV_n,G,PM,KS,KD,springs,DIM);
+[particleVelocities,particleForces] = init_update(dt,particlePositions,particleVelocities,G,particleMasses,springKS,springKD,springs,DIM);
+
+%profile on;
 
 %%%% MAIN LOOP %%%%
-atEnergies = 1;
+atEnergies = 2;
+updateNumber = 1;
 for t = TIMES
-    %half euler step forward
-    V_hf = PV_n + 0.5*dt*PF_n./PM;
+    %half euler step forward to calculate forces in sync
+    particleVelocitiesHalfForward = particleVelocities + 0.5*dt*particleForces./particleMasses;
+    
+    particleForces = zeros(particleNumbers,3);
+    %UPDATE GRAVITY
+    particleForces = calc_gravity_forces(particleForces,particleMasses,G,DIM);
+    %UPDATE SPRING FORCES, use half euler forward
+    particleForces = calc_spring_forces(particlePositions,particleVelocitiesHalfForward,particleForces,springKS,springKD,springs);
+    %UPDATE POSITION AND VELOCITY
+    [particlePositions, particleVelocities] = update_rv(dt,particlePositions,particleVelocities,particleForces,particleMasses);
     
     %UPDATE COLLISION
-    [PR_n, PV_n] = update_coll(PR_n,PV_n,BR_n,GBR);
+    [particlePositions, particleVelocities] = update_coll(particlePositions,particleVelocities,groundBallPositions,groundBallRadius);
     
-    %%%% BIG CALC
-    PF_n = zeros(NP,3);
-    %UPDATE GRAVITY
-    PF_n = calc_gravity_forces(PF_n,PM,G,DIM);
-    %UPDATE SPRING FORCES, use half euler forward
-    PF_n = calc_spring_forces(PR_n,V_hf,PF_n,KS,KD,springs);
-    %UPDATE POSITION AND VELOCITY
-    [PR_n, PV_n] = update_rv(dt,PR_n,PV_n,PF_n,PM);
+    % take a half euler step forward to calculate energies in sync
+    particleVelocitiesHalfForward = particleVelocities + 0.5*dt*particleForces./particleMasses;
     
-    if mod(t,dt*drawUpdate) == 0
-        lines = draw_lines(PR_n, lines);
+    if mod(updateNumber,drawUpdate) == 0
+        lines = draw_lines(particlePositions, lines);
         drawnow;
     end
     
     %%%% PLOT AND CALC ENERGIES %%%%
     
-    if mod(t,dt*energyUpdate) == 0
-        ETIMES(atEnergies) = t;
+    if mod(updateNumber,energyUpdate) == 0
+        energyTimes(atEnergies) = t;
         % PARTICLE ENERGIES
-        EKP(atEnergies) = energy_kinetic(PV_n, PM);
-        EFP(atEnergies) = energy_springs(PR_n,springs,KS);
-        EPP(atEnergies) = energy_gravity(PR_n,PM,G,DIM);
-        ETP(atEnergies) = EKP(atEnergies) + EFP(atEnergies) + EPP(atEnergies);
+        particleEnergyKinetic(atEnergies) = energy_kinetic(particleVelocitiesHalfForward, particleMasses);
+        particleEnergySprings(atEnergies) = energy_springs(particlePositions,springs,springKS);
+        particleEnergyPotential(atEnergies) = energy_gravity(particlePositions,particleMasses,G,DIM);
+        particleEnergyTotal(atEnergies) = particleEnergyKinetic(atEnergies)...
+            + particleEnergySprings(atEnergies)...
+            + particleEnergyPotential(atEnergies);
         
         atEnergies = atEnergies + 1;
     end
+    
+    updateNumber = updateNumber + 1;
 end
 
+%profile viewer;
+
 figure(2);
-plot(ETIMES, EKP, '-r');
+plot(energyTimes, particleEnergyKinetic, '-r');
 hold on;
-plot(ETIMES, EFP, '-b');
+plot(energyTimes, particleEnergySprings, '-b');
 hold on;
-plot(ETIMES, EPP, '-g');
+plot(energyTimes, particleEnergyPotential, '-g');
 hold on;
-plot(ETIMES, ETP, '-m');
-legend('Kinetic','Springs','Potential','Total');
+plot(energyTimes, particleEnergyTotal, '-m');
+legend('Kinetic','springs','Potential','Total');
+
+maxEnergyDifference = max_energy_diff(particleEnergyTotal)
 
 
 
