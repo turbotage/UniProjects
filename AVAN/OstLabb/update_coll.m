@@ -37,35 +37,54 @@ function [PR_n, PV_n] = update_coll(PR_n, PV_n, BR_n, BR)
 %     end
     
     % WITH PERFECT TRANSLATION TO SURFACE OF GROUND
+    
+    R = BR_n;
+    for i=1:length(PR_n(:,1))
+        R = PR_n(i,:) - BR_n;
+        collided = find(sum(R.*R,2) < BR*BR);
+        if isempty(collided) == 1
+           continue; 
+        end
+        
+        r = PR_n(i,:) - BR_n(collided(1),:);
+        dr = norm(r);
+        v = PV_n(i,:);
+        dv = norm(v);
 
-    Rd = PR_n(:,1);
-    R = PR_n;
-    for i=1:length(BR_n(:,1))
-        R = ((PR_n - BR_n(i,:)).^2).';
-        Rd = sqrt(sum(R));
-        collided = find(Rd < BR);
-        for j=1:length(collided)
-            p_i = collided(j);
-            r = PR_n(p_i,:) - BR_n(i,:);
-            dr = norm(r);
-            v = PV_n(p_i,:);
-            dv = norm(v);
-            
+        c = acos(dot(-v,r)/(dr*dv));
+%         if isreal(c) == 0
+%            disp('complex'); 
+%         end
+        if c < 10^(-14)
+            disp('in c==0');
             % TRANSLATE
-            c = acos(dot(-v,r)/(dr*dv));
-            if c < 10^(-5)
-                PR_n(p_i,:) = PR_n(p_i,:) - (BR-dr)*v/dv;
-            else
-                beta = asin((sin(c)*dr/BR));
-                h = sin(c-beta)*BR/sin(c);
-                PR_n(p_i,:) = PR_n(p_i,:) - h*v/dv;
-            end
-            
+            PR_n(i,:) = PR_n(i,:) - (BR-dr)*v/dv;
             % VELOCITIES
-            r = PR_n(p_i,:) - BR_n(i,:);
+            PV_n(i,:) = -PV_n(i,:);
+            
+            dt = (BR-dr)/dv;
+            PR_n(i,:) = PR_n(i,:) + PV_n(i,:)*dt;
+        else
+            beta = asin((sin(c)*dr/BR));
+            h = sin(c-beta)*BR/sin(c);
+            % TRANSLATE
+            PR_n(i,:) = PR_n(i,:) - h*v/dv;
+
+            %TEST IF WE STILL ARE INSIDE A BALL
+            %R = PR_n(i,:) - BR_n;
+            %collided = find(sum(R.*R,2) < BR*BR)
+            %seems to not be needed
+
+            % VELOCITIES
+            r = PR_n(i,:) - BR_n(collided(1),:);
             dr = norm(r);
-            normal = (dot(-v,r)/(dr*dr))*r;
-            PV_n(p_i,:) = PV_n(p_i,:) + 2*normal;
+            normal = (dot(v,r)/(dr*dr))*r;
+            PV_n(i,:) = PV_n(i,:) - 2*normal;
+            
+            %LET THE PARTICLE BOUNCE AWAY FROM THE SURFACE
+            dv = norm(PV_n(i,:));
+            dt = h/dv;
+            PR_n(i,:) = PR_n(i,:) + dt*PV_n(i,:);
         end
     end
 

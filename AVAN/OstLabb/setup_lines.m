@@ -1,8 +1,8 @@
-function lines = setup_lines(R_n, springs, NR, NC, dim)
+function lines = setup_lines(R_n, springs, NC, NR, DIM)
     lines = struct([]);
     % TOP
     k = 1;
-    if dim == 2
+    if DIM == 2
         % TOPPEEM
         for i = 1:(NC-1)
             lines(k).fromPI = springs(i).fromPI;
@@ -50,7 +50,7 @@ function lines = setup_lines(R_n, springs, NR, NC, dim)
             %set(lines(i).line,'erasemode','xor');
             k = k + 1;
         end 
-    elseif dim == 3
+    elseif DIM == 3
         % TOPPEEM
         for i = 1:(NC-1)
             lines(k).fromPI = springs(i).fromPI;

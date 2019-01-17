@@ -4,29 +4,27 @@
 %%%%%%%%%%%%% GLOBAL DEFINITIONS %%%%%%%%%%%%%%%%%%%%%%%
 %%%% GENERAL SETTINGS %%%%
 dt = 0.002;
-drawUpdate = 10; %update every drawUpdate:th frame
-energyUpdate = 40; %update every energyUpdate:th frame
+drawUpdate = 2; %update every drawUpdate:th frame
+energyUpdate = 1; %update every energyUpdate:th frame
 
-TIMES = 0:dt:(0.002*8000-1);
+TIMES = 0:dt:3;
 
 DIM = 2; %decides how to draw, setup ground and in which direction gravity acts
-G = -2; %gravity constant
+G = -1; %gravity constant
 
 %%%% PARTICLES SETTINGS %%%%
-particleColumns = 18; %number of columns x-axis for particle system
-particleRows = 8; %number of rows y-axis for particle system
+particleColumns = 8; %number of columns x-axis for particle system
+particleRows = 4; %number of rows y-axis for particle system
 particleLayers = 3; %number of layers z-axis for particle system
-if DIM == 2
-   particleLayers = 1;
-end
+particleLayers = 1;
 particleNumbers = particleColumns*particleRows*particleLayers; %number of particles
 particleScale = 1; %particle-scale
 particleMasses = ones(particleNumbers,1);
 
 %%%% springs SETTINGS %%%%
 springNumbers = get_number_of_springs(particleColumns,particleRows,particleLayers);
-springKS = 500; %coefficient for spring-force
-springKD = 1.5; %coefficient of spring-damping
+springKS = 100; %coefficient for spring-force
+springKD = 0; %coefficient of spring-damping
 
 %%%% ENERGY SETTINGS %%%%
 energyCalcN = floor(length(TIMES)/energyUpdate)+1;
@@ -38,45 +36,36 @@ particleEnergySprings = zeros(energyCalcN, 1);
 particleEnergyTotal = zeros(energyCalcN, 1);
 
 %%%% GROUND SETTINGS %%%%
-groundNX = 0;
-groundNY = 0;
-if DIM == 2
-    groundNX = 200; %ground generation will ignore groundNY
-elseif DIM == 3
-    groundNX = 25; %number of balls in x-dir
-    groundNY = 7; %number of balls in y-dir 
-end
-groundScale = 0.8; %ground-scale
-groundStartPoint = [0,0,0]; %ground-starting-point
-groundBallRadius=1;  % Radius for ground balls
-outerIndices = get_outer_indices(particleColumns,particleRows,particleLayers,DIM);
+% groundNX = 0;
+% groundNY = 0;
+% if DIM == 2
+%     groundNX = 30; %ground generation will ignore groundNY
+% elseif DIM == 3
+%     groundNX = 16; %number of balls in x-dir
+%     groundNY = 7; %number of balls in y-dir 
+% end
+% groundScale = 1; %ground-scale
+% groundStartPoint = [0,0,0]; %ground-starting-point
+% groundBallRadius=1;  % Radius for ground balls
 
 %%%%%%%%%%% GENERATE GROUND %%%%%%%%%%%%%%
-groundBallPositions = generate_ground(groundNX,groundNY,groundScale,groundStartPoint,groundBallRadius,DIM);
+%groundBallPositions = generate_ground(groundNX,groundNY,groundScale,groundStartPoint,groundBallRadius,DIM);
 %%% SETUP BALLS GRAPHICAL OBJECTS %%%
 
 %%%%%%%%%% GENERATE CUBOID POSITIONS AND springs %%%%%%%
 [particlePositions, springs] = setup_cuboid(particleColumns,particleRows,particleLayers,particleScale);
 %%%% SETUP CUBOID lines %%%%
 lines = setup_lines_cross(particlePositions, springs, DIM);
-%lines = setup_lines(particlePositions, springs, particleColumns, particleRows, DIM);
 
 %%%%%%%%% PARTICLE PERTRUBATIONS %%%%%%%%
 %%%% INITIAL POSITION %%%%
-particlePositionsOld = particlePositions;
-if DIM == 2
-    particlePositions(:,:) = particlePositions(:,:) + [-4,groundBallRadius + 0.5,0];
-elseif DIM == 3
-    particlePositions(:,:) = particlePositions(:,:) + [0,0,groundBallRadius+1];
+%slight disturbance
+for i=1:length(particlePositions)
+   particlePositions(i,:) = particlePositions(i,:) + rand(1,3)*0.2; 
 end
 %%%% INITIAL VELOCITIES %%%%
 particleVelocities = zeros(particleNumbers,3);
-particleVelocitiesOld = particleVelocities;
-if DIM == 2
-    particleVelocities(:,:) = particleVelocities(:,:) + [15,0,0];
-elseif DIM == 3
-    particleVelocities(:,:) = particleVelocities(:,:) + [10,0,-8];
-end
+particleVelocities(:,:) = particleVelocities(:,:) + [0,0,0];
 %%%% INITIAL FORCES %%%%
 particleForces = zeros(particleNumbers, 3);
 
@@ -108,11 +97,11 @@ particleEnergyTotal(1) = particleEnergyKinetic(1) + particleEnergySprings(1) + p
 %%%% INITIAL UPDATE %%%%
 [particleVelocities,particleForces] = init_update(dt,particlePositions,particleVelocities,G,particleMasses,springKS,springKD,springs,DIM);
 
+%profile on;
 
 %%%% MAIN LOOP %%%%
 atEnergies = 2;
 updateNumber = 1;
-profile on;
 for t = TIMES
     %half euler step forward to calculate forces in sync
     %particleVelocitiesHalfForward = particleVelocities + 0.5*dt*particleForces./particleMasses;
@@ -126,7 +115,7 @@ for t = TIMES
     [particlePositions, particleVelocities] = update_rv(dt,particlePositions,particleVelocities,particleForces,particleMasses);
     
     %UPDATE COLLISION
-    [particlePositions, particleVelocities] = update_coll(particlePositions,particleVelocities,groundBallPositions,groundBallRadius);
+    %[particlePositions, particleVelocities] = update_coll(particlePositions,particleVelocities,groundBallPositions,groundBallRadius);
     
     % take a half euler step forward to calculate energies in sync
     particleVelocitiesHalfForward = particleVelocities + 0.5*dt*particleForces./particleMasses;
@@ -153,7 +142,8 @@ for t = TIMES
     
     updateNumber = updateNumber + 1;
 end
-profile viewer;
+
+%profile viewer;
 
 figure(2);
 plot(energyTimes, particleEnergyKinetic, '-r');
@@ -166,9 +156,4 @@ plot(energyTimes, particleEnergyTotal, '-m');
 legend('Kinetic','springs','Potential','Total');
 
 maxEnergyDifference = max_energy_diff(particleEnergyTotal)
-
-
-
-
-
 
