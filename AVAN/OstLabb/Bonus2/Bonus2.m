@@ -3,14 +3,14 @@
 
 %%%%%%%%%%%%% GLOBAL DEFINITIONS %%%%%%%%%%%%%%%%%%%%%%%
 %%%% GENERAL SETTINGS %%%%
-dt = 0.001;
-drawUpdate = 5; %update every drawUpdate:th frame
-energyUpdate = 20; %update every energyUpdate:th frame
+dt = 0.0001;
+drawUpdate = 10; %update every drawUpdate:th frame
+energyUpdate = 1; %update every energyUpdate:th frame
 
-TIMES = 0:dt:1;
+TIMES = 0:dt:0.05;
 
 DIM = 3; %decides how to draw, setup ground and in which direction gravity acts
-G = -1; %gravity constant
+G = -10; %gravity constant
 
 %%%% PARTICLES SETTINGS %%%%
 particleColumns = 12; %number of columns x-axis for particle system
@@ -18,12 +18,12 @@ particleRows = 12; %number of rows y-axis for particle system
 particleLayers = 1; %number of layers z-axis for particle system
 particleNumbers = particleColumns*particleRows*particleLayers; %number of particles
 particleScale = 0.4; %particle-scale
-particleMasses = ones(particleNumbers,1)*0.1;
+particleMasses = ones(particleNumbers,1)*0.2;
 
 %%%% springs SETTINGS %%%%
 springNumbers = get_number_of_springs(particleColumns,particleRows,particleLayers);
-springKS = 10000; %coefficient for spring-force
-springKD = 20; %coefficient of spring-damping
+springKS = 1000000; %coefficient for spring-force
+springKD = 80; %coefficient of spring-damping
 
 %%%% ENERGY SETTINGS %%%%
 energyCalcN = floor(length(TIMES)/energyUpdate)+1;
@@ -42,7 +42,7 @@ systemEnergyTotal = zeros(energyCalcN,1);
 
 %%%%%%%%%% GENERATE BALL AND BALL SETTINGS %%%%%%%%%%
 ballN = 1;
-ballMasses = ones(ballN,1)*20;
+ballMasses = ones(ballN,1)*80;
 ballPositions = [2,2,6];
 ballVelocities = [0,0,0];
 ballForces = [0,0,0];
@@ -113,6 +113,7 @@ for t = TIMES
     %ballVelocitiesHalfForward = ballVelocities + 0.5*dt*ballForces./ballMasses;
     
     particleForces = zeros(particleNumbers,3);
+    %ballForces = zeros(ballN,3);
     %UPDATE GRAVITY
     particleForces = calc_gravity_forces(particleForces,particleMasses,G,DIM);
     ballForces = calc_gravity_forces(ballForces, ballMasses,G,DIM);
@@ -159,7 +160,7 @@ for t = TIMES
         % BALL ENERGIES
         ballEnergyKinetic(atEnergies) = energy_kinetic(ballVelocitiesHalfForward, ballMasses);
         ballEnergyPotential(atEnergies) = energy_gravity(ballPositions,ballMasses,G,DIM);
-        ballEnergyTotal(atEnergies) = ballEnergyKinetic(1) + ballEnergyPotential(1);
+        ballEnergyTotal(atEnergies) = ballEnergyKinetic(atEnergies) + ballEnergyPotential(atEnergies);
         
         % TOTAL SYSTEM ENERGIES
         systemEnergyTotal(atEnergies) = particleEnergyTotal(atEnergies) + ballEnergyTotal(atEnergies);
@@ -184,18 +185,18 @@ plot(energyTimes, particleEnergyTotal, '-m');
 legend('Kinetic','springs','Potential','Total');
 
 subplot(2,2,2);
-plot(energyTimes, ballEnergyKinetic, '-r');
-hold on;
+% plot(energyTimes, ballEnergyKinetic, '-r');
+% hold on;
 plot(energyTimes, ballEnergyPotential, '-b');
 hold on;
-plot(energyTimes, ballEnergyTotal, '-m');
-legend('Kinetic', 'Potential', 'Total');
+% plot(energyTimes, ballEnergyTotal, '-m');
+legend('Potential');
 
 subplot(2,1,2);
 plot(energyTimes, systemEnergyTotal, '-m');
 legend('System Total');
 
-maxEnergyDifference = max_energy_diff(particleEnergyTotal)
+maxEnergyDifference = max_energy_diff(systemEnergyTotal)
 
 
 
