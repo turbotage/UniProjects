@@ -1,6 +1,6 @@
 function z = mydft(y)
     % Compute the DFT of a vector y of length N
-    % z k = 1/N sum {1=0}ˆ{N-1}y 1 exp(-2 pi k 1/N)
+    % z k = 1/N sum {1=0}?{N-1}y 1 exp(-2 pi k 1/N)
     N = length(y);
     z = zeros(1,N);
     omega = exp(-2.*pi.*1i./N);

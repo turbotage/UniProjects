@@ -119,9 +119,10 @@ z=mydft(y);
 b_n = getbn(z);
 a_n = getan(z);
 
-x2 = 0:0.001:2*pi;
-x_i=part_sum(z,x2);
 
+x_i=part_sum(z,x1);
+
+x2 = 0:0.002:2*pi;
 
 figure(1)
 stem([0:N-1],real(z));
@@ -129,9 +130,9 @@ hold on;
 stem([0:N-1],imag(z));
 
 figure(2)
-plot(x2,h(x2), '-b');
+plot(x2,h(x2), '.b');
 hold on;
-plot(x2,x_i,'-r');
+plot(x1,x_i,'-r');
 
 
 %% assignment 3
