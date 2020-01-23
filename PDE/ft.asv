@@ -1,4 +1,3 @@
-
 %% assignment 1
 y_1 = [8,12,-4,4];
 z = mydft(y_1);
@@ -119,10 +118,9 @@ z=mydft(y);
 b_n = getbn(z);
 a_n = getan(z);
 
+x2 = 0:0.001:2*pi;
+x_i=part_sum(z,x2);
 
-x_i=part_sum(z,x1);
-
-x2 = 0:0.002:2*pi;
 
 figure(1)
 stem([0:N-1],real(z));
@@ -130,14 +128,67 @@ hold on;
 stem([0:N-1],imag(z));
 
 figure(2)
-plot(x2,h(x2), '.b');
+plot(x2,h(x2), '-b');
 hold on;
-plot(x1,x_i,'-r');
+plot(x2,x_i,'-r');
+legend('h(x)','Approximated h(x)');
+xlabel('
 
 
-%% assignment 3
+%% assignment 3 (a) & (b)
 y = [8,12,-4,4];
-z1 = myfft(y,4)
-z2 = mydft(y);
-z3 = myifft(z1,4)
+z1 = myfft(y,4);
+z2 = myifft(z1,4);
+disp(y - z2)
+
+%% assignment 3 (c)
+
+avgDFTTime = 0;
+avgFFTTime = 0;
+runs = 50;
+
+vectorLength = 2^12;
+vector = 100*rand(1,vectorLength);
+result = zeros(1,vectorLength);
+
+
+for i = 1:runs
+    vector = 100*rand(1,vectorLength);
+    
+    tic;
+    result = mydft(vector);
+    avgDFTTime = avgDFTTime + toc;
+    
+    tic;
+    result = myfft(vector, vectorLength);
+    avgFFTTime = avgFFTTime + toc;
+    disp(i);
+end
+
+avgDFTTime = avgDFTTime / runs
+avgFFTTime = avgFFTTime / runs
+
+%avgDFTTime / avgFFTTime
+
+
+%% assignment 4
+fid = fopen('filtre.data.txt','r');
+Y = fscanf(fid,'%f',[1,inf]);
+fclose(fid);
+figure;
+plot(Y, '-b');
+
+z = myfft(Y,length(Y));
+
+J = 1:length(Y);
+cutoff = 10^(-3);
+
+toRemove = find(abs(z(J)) < cutoff)
+
+z(toRemove) = 0;
+
+Y_new = myifft(z,length(Y));
+
+hold on;
+plot(Y_new, '-r');
 

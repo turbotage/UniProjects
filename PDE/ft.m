@@ -1,4 +1,3 @@
-
 %% assignment 1
 y_1 = [8,12,-4,4];
 z = mydft(y_1);
@@ -108,7 +107,7 @@ title('Subplot 4: g(x)')
 %% assignment 2 (d)
 h = @(x) x.*((-pi<x) & (x < pi)) + (x - 2*pi).*((pi < x) & (x < 2*pi));
 
-N = 2^4;
+N = 2^8;
 x = zeros(1,N);
 % (0,2pi)
 for i=0:(N-1)
@@ -132,11 +131,77 @@ figure(2)
 plot(x2,h(x2), '-b');
 hold on;
 plot(x2,x_i,'-r');
+legend('h(x)','Approximated h(x)');
+xlabel('x');
+ylabel('y');
+title('h(x) together with fourier partial sum of h(x), N=2^8');
 
-
-%% assignment 3
+%% assignment 3 (a) & (b)
 y = [8,12,-4,4];
-z1 = myfft(y,4)
-z2 = mydft(y);
-z3 = myifft(z1,4)
+z1 = myfft(y,4);
+z2 = myifft(z1,4);
+disp(y - z2)
+
+%% assignment 3 (c)
+
+avgDFTTime = 0;
+avgFFTTime = 0;
+runs = 50;
+
+vectorLength = 2^12;
+vector = 100*rand(1,vectorLength);
+result = zeros(1,vectorLength);
+
+
+for i = 1:runs
+    vector = 100*rand(1,vectorLength);
+    
+    tic;
+    result = mydft(vector);
+    avgDFTTime = avgDFTTime + toc;
+    
+    tic;
+    result = myfft(vector, vectorLength);
+    avgFFTTime = avgFFTTime + toc;
+    disp(i);
+end
+
+avgDFTTime = avgDFTTime / runs
+avgFFTTime = avgFFTTime / runs
+
+%avgDFTTime / avgFFTTime
+
+
+%% assignment 4
+fid = fopen('filtre.data.txt','r');
+Y = fscanf(fid,'%f',[1,inf]);
+fclose(fid);
+figure;
+
+z1 = myfft(Y,length(Y));
+
+cutoff = 10^(-2);
+
+toRemove = find(abs(z1) < cutoff);
+
+z1(toRemove) = 0;
+
+Y_new = myifft(z1,length(z1));
+
+x2 = 0:(length(Y)-1);
+x2 = x2*2*pi/(length(Y)-1);
+figure(1);
+plot(x2,Y, '-b');
+legend('Data');
+xlabel('x');
+ylabel('y');
+title('Data');
+axis([0,2*pi,-1.1,1.1]);
+figure(2);
+plot(x2,Y_new, '-r');
+legend('Filtered Data');
+xlabel('x');
+ylabel('y');
+title('Filtered data');
+axis([0,2*pi,-1.1,1.1]);
 
