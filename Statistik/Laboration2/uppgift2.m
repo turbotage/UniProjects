@@ -1,67 +1,68 @@
-%%
-%uppgift 1
-T = load('kroppstemperatur.txt');
+% load and check assumptions
+clc;
+clear all;
 
-[h] = lillietest(T(:,1)) % det går inte att förkasta att temperaturen är normalfördelad
+IN = load('kroppstemperatur.txt');
 
-h = ttest(T(:,1),98.6) % ger h=1 dvs h_0 kan förkastas
-
-%%
-%uppgift 2
+T = IN(:,1);
+X = IN(:,3);
 
 nmen = 0;
 nwomen = 0;
 
-for i=1:length(T(:,1))
-    if T(i,2) == 1
+for i=1:length(T)
+    if IN(i,2) == 1
         nmen = nmen + 1;
     else
         nwomen = nwomen + 1;
     end
 end
 
-menTemperatures = T(1:nmen,1);
-womenTemperatures = T(nmen+1:length(T(:,1)),1);
+T_m = T(1:nmen);
+T_k = T(nmen+1:length(T));
 
-h_men = lillietest(menTemperatures)
-h_women = lillietest(womenTemperatures)
 
-h = ttest2(menTemperatures, womenTemperatures)
+
+% assumption 1
+[h_T,p_T] = lillietest(T)
+[h_X,p_T] = lillietest(X)
+
+% assumption 2
+[h_T_m,p_T_m] = lillietest(T_m)
+[h_T_k,p_T_k] = lillietest(T_k)
+
+[h_v,p_v] = vartest2(T_m,T_k)
+
+
+%%
+%Problem 1
+[h,p] = ttest(T,98.6)
+
+%%
+%Problem 2
+
+[h,p] = ttest2(T_m,T_k)
 	
 %%
-%uppgift3
+%Problem 3
+T_reg = [ones(size(T)),T];
+[B,BINT,R,RINT,STATS] = regress(X,T_reg)
 
-x = T(:,1);
-y = T(:,3);
-
-
-nmen = 0;
-nwomen = 0;
-
-for i=1:length(T(:,1))
-    if T(i,2) == 1
-        nmen = nmen + 1;
-    else
-        nwomen = nwomen + 1;
-    end
-end
-
-menTemperatures = T(1:nmen,1);
-menHeartF = T(1:nmen,3);
-womenTemperatures = T(nmen+1:length(T(:,1)),1);
-womenHeartF = T(nmen+1:length(T(:,1)),3);
-
-
-X = [ones(size(x)),x];
-[B,BINT,R,RINT,STATS] = regress(y,X)
-
-f = @(x) B(2)*x + B(1)
+f = @(x) B(2).*x + B(1)
 
 figure(1);
-plot(T(:,1),T(:,3),'.');
+plot(T,X,'.');
+ylabel('Hj�rtfrekvens [BPM]');
+xlabel('Kroppstemperatur [F]');
+title('Spridningsdiagram av datat');
+
+figure(2);
+plot(T,X,'.');
 hold on;
 fplot(f);
-axis auto xy;
-
+axis([96.2 100.9 56 90]);
+ylabel('Hj�rtfrekvens [BPM]');
+xlabel('Kroppstemperatur [F]');
+title('Spridningsdiagram och regressionslinje');
 
 

@@ -1,7 +1,8 @@
 function [x,y,vx,vy,ax,ay,t] = orbit_Nbody(G, m, x0, y0, vx0, vy0, dt, tmax)
 	t = dt:dt:tmax;
+    t = t - dt;
 	steps = floor(tmax/dt);
-
+    
 	x = zeros(steps,length(m));
 	y = zeros(steps,length(m));
 	vx = zeros(steps,length(m));
