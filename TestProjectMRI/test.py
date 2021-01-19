@@ -31,5 +31,6 @@ def load_images(path):
 
     
     
+setup_device()
     
 load_images('Images/')
