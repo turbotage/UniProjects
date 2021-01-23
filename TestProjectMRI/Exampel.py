@@ -118,5 +118,5 @@ if __name__ == "__main__":
 
     time_elapsed = end - start
 
-    print()
+    print(time_elapsed)
     print(f"Speed: {data.shape[0] / time_elapsed} fit voxels/s")
