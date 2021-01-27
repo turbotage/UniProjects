@@ -10,8 +10,10 @@ import time
 
 import torch
 import matplotlib.pyplot as plt #for plotting
+from scipy.optimize import curve_fit
 
 from torchvision import datasets, transforms
+import random
 
 
 # START OF SOLVER
@@ -28,62 +30,48 @@ def get_diff(func, params, data):
 def get_step(J, JT, JT_diff):
     # AX=B
     JTJ = torch.bmm(JT,J) # (JTJ)
-    #print(JTJ)
-    
-    #print((torch.det(JTJ) < 0.0000001).sum())
     
     ill_behaved = (torch.logical_or(torch.det(JTJ) < 1, torch.det(JTJ) > 1e30)).reshape(JTJ.size()[0],1,1)
     
     eye = torch.eye(JTJ.size()[1]).repeat(JTJ.size()[0],1).reshape(JTJ.size()[0],JTJ.size()[1],JTJ.size()[1]).cuda()
     
-    perturb = eye * ill_behaved * 2
-    #print(perturb[14056])
+    perturb = eye * ill_behaved * 10
     
-    print(JTJ[14056])
+    JTJ = JTJ *((ill_behaved * 1e-25) + torch.logical_not(ill_behaved)) + perturb
     
+    JT_diff = JT_diff * ((ill_behaved * 1e-25) + torch.logical_not(ill_behaved))
     
-    JTJ = JTJ *((ill_behaved * 1e-20) + torch.logical_not(ill_behaved)) - perturb
-    
-    
-    print(JTJ[14056])
-    
-    #print(JTJ.size())
-    
-    #print(JTJ)
-    
-    #print((torch.det(JTJ) < 0.0000001).sum())
     
     # Solve via Cholskey decomposition, in theory better than LU for this problem
-    #u = torch.cholesky(JTJ)
-    #param_step = torch.cholesky_solve(JT_diff,u).transpose(0,2)[0]
-    
-    # Use LU for now
-    param_step, LU = torch.solve(JT_diff, JTJ)
+    u = torch.cholesky(JTJ)
+    param_step = torch.cholesky_solve(JT_diff,u).transpose(0,2)[0]
     
     return param_step
 
 
-def solve(func,data,guess):
+def solve(model,dependent,data,guess):
     
-    f = lambda params: func(params).sum(dim=1)
+    func = model(dependent)
+    f = lambda p: func(p).sum(dim=1)
     
-    iteration = 0
-    threshold = 10^(-6)
+    non_convergence_list = torch.arange(0,guess.size()[1]).cuda()
+
     
     # Initial Step
     J, JT = get_jacobians(f, guess)
     diff = get_diff(func,guess,data)
-    
     JT_diff = torch.bmm(JT,diff)
-    
-    error_sum = (JT_diff*JT_diff).sum(dim=1)
-    
+    step = get_step(J, JT, JT_diff)
+    old_step = torch.zeros(step.size()[0],step.size()[1]).cuda()
+    converges = torch.abs((old_step - step) / guess) < 0.001
+    not_converging = converges.sum(dim=0) < 2
+
+    params = guess
     #print("initial step done")
     
-    while (error_sum < threshold).sum() != data.size()[1] and iteration < 10:
+    iteration = 0
+    while (converges.sum() != guess.size()[1]*guess.size()[0]) and iteration < 3000:
         iteration += 1
-        
-        step = get_step(J, JT, JT_diff)
         
         guess = guess + step
         
@@ -91,48 +79,120 @@ def solve(func,data,guess):
         diff = get_diff(func,guess,data)
         
         JT_diff = torch.bmm(JT,diff)
-        error_sum = (JT_diff*JT_diff).sum(dim=1)
         
-        print(iteration)
+        old_step = step
+        step = get_step(J, JT, JT_diff)
         
-    return guess
+        converges = torch.abs((old_step - step) / guess) < 0.001
+        
+        if iteration % 10 == 0:
+            # copy converging pixels
+            #print((params[:,non_convergence_list[converges.sum(dim=0) > 1]]).shape)
+            #print((guess[:,converges.sum(dim=0) > 1]).shape)
+            
+            #print(params.shape)
+            #print(non_convergence_list.shape)
+            #print(converges.shape)
+            
+            
+            params[:,non_convergence_list[converges.sum(dim=0) > 1]] = guess[:,converges.sum(dim=0) > 1]
+            
+            
+            # rebuild solver to solve with non-converging pixels
+            not_converging = converges.sum(dim=0) < 2
+            
+            dependent = dependent[:,not_converging]
+            data = data[:,not_converging]
+            guess = guess[:,not_converging]
+            step = step[:,not_converging]
+            converges = converges[:,not_converging]
+            
+            func = model(dependent)
+            f = lambda p: func(p).sum(dim=1)
+            
+            # rebuild non convergence list
+            non_convergence_list = non_convergence_list[not_converging]
+            
+            #print(converges)
+            #print(step)
+        
+            
+        
+        
+        
+    params[:,non_convergence_list[converges.sum(dim=0) > 1]] = guess[:,converges.sum(dim=0) > 1]
+        
+    return params
         
        
 # END OF SOLVER
         
        
 
+
+# SETUP MODEL    
+
+def get_model(model_expr):
+    model_expr = model_expr.replace('x', 'dependent')
+    # Replace math expr in order of pytorch docs
+    model_expr = model_expr.replace('abs', 'torch.abs')
+    model_expr = model_expr.replace('acos', 'torch.acos')
+    model_expr = model_expr.replace('acosh', 'torch.acosh')
+    model_expr = model_expr.replace('asin', 'torch.sin')
+    model_expr = model_expr.replace('asinh', 'torch.asinh')
+    model_expr = model_expr.replace('atan', 'torch.atan')
+    model_expr = model_expr.replace('atanh', 'torch.atanh')
+    model_expr = model_expr.replace('atan2', 'torch.atan2')
+    #model_expr = model_expr.replace('conj', 'torch.conj')
+    model_expr = model_expr.replace('cos', 'torch.cos')
+    model_expr = model_expr.replace('cosh', 'torch.cosh')
+    model_expr = model_expr.replace('exp', 'torch.exp')
+    model_expr = model_expr.replace('log', 'torch.log')
+    model_expr = model_expr.replace('pow', 'torch.pow')
+    model_expr = model_expr.replace('rsqrt', 'torch.rsqrt')
+    model_expr = model_expr.replace('sin', 'torch.sin')
+    model_expr = model_expr.replace('sinh', 'torch.sinh')
+    model_expr = model_expr.replace('sqrt', 'torch.sqrt')
+    model_expr = model_expr.replace('tan', 'torch.tan')
+    model_expr = model_expr.replace('tanh', 'torch.tanh')
     
-def model(dependent):
-    return lambda params: params[:][0] * torch.exp(-dependent * params[:][1])
+    # Paramaters
+    for i in range(50):
+        model_expr = model_expr.replace('p' + str(i), 'params[:][' + str(i) + ']')
+        
+        
+    return lambda dependent, params: eval(model_expr)
+
+def get_func(model,dependent):
+    return lambda params: model(dependent, params)
+
+# END OF MODEL
 
 
 
-def get_guess(data, imgs, b_vals):
-    log_S = torch.log(data)
-    max_index = np.argmax(b_vals)
-    min_index = np.argmin(b_vals)
-    
-    ADC = (log_S[max_index,:] - log_S[min_index,:])/(b_vals[min_index]-b_vals[max_index])
-    
-    S0 = torch.exp(log_S[max_index,:] + b_vals[max_index]*ADC)
-    
-    guess = torch.zeros(2,data.size()[1]).cuda()
-    guess[0,:] = S0
-    guess[1,:] = ADC
+# GET PARAMETER GUESS
+
+def get_uniform_guess(data,uniform_param_guess):
+    guess = torch.zeros(len(uniform_param_guess),data.size()[1]).cuda()
+    for i in range(len(uniform_param_guess)):
+        guess[i,:] = uniform_param_guess[i]
+        
     return guess
 
 
-def get_bad_guess(data,imgs,b_vals):
-    guess = torch.zeros(2,data.size()[1]).cuda()
-    guess[0,:] = 100
-    guess[1,:] = 0.001
-    return guess
 
+# END PARAMETER GUESS
+
+
+
+
+
+# LOAD AND TIDY DATA
 
 def load_data(file_name: str):
     data = np.load(file_name)
     return data['img'], data['b_vals'].astype(np.float32)
+
 
 def project_to_vector(img: np.ndarray, mask_image: np.ndarray) -> np.ndarray:
     """
@@ -159,15 +219,11 @@ def project_to_image(vector: np.ndarray, mask_image: np.ndarray) -> np.ndarray:
 
 
 
-def setup_device():
-    torch.cuda.set_device(0)
-    print('Used GPU Name:', torch.cuda.get_device_name(torch.cuda.current_device()))
-    
-
 
 if __name__ == "__main__":
     # Setup CUDA
-    setup_device()
+    torch.cuda.set_device(0)
+    print('Used GPU Name:', torch.cuda.get_device_name(torch.cuda.current_device()))
     
     
     # Load the data
@@ -179,17 +235,18 @@ if __name__ == "__main__":
 
     # The data is now shaped as (92, 92, 25, 5). It is more convenient to have it on the shape (n_pixels x 5)
     # where n_pixels are the number of pixels in the mask.
-    data = torch.from_numpy(project_to_vector(imgs, mask)).transpose(0,1).cuda()
-    guess = get_bad_guess(data, imgs, b_vals)
+    data = project_to_vector(imgs, mask)
+    #initial_params = get_mean_guess(diffusion_model,data,b_vals)
+    
+    
+    guess = get_mean_guess(diffusion_model,data,b_vals)
+    data = torch.from_numpy(data).transpose(0,1).cuda()
     dependent = torch.from_numpy(b_vals).repeat(data.size()[1],1).transpose(0,1).cuda()
     
     
-    
-    func = model(dependent)
-    
     start = time.time() 
 
-    found_params = solve(func, data, guess)
+    found_params = solve(model, dependent, data, guess)
     
     end = time.time()
     

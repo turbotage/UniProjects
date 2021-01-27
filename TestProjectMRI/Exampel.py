@@ -64,10 +64,10 @@ def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=
 def fit_diffusion_data(b, data):
     n_pixels = data.shape[0]
     params = np.zeros((n_pixels, 2))
-
+    
     # Uniform initial guess for all pixels
     initial_params = np.array([1000, 0.002])
-
+    
     for i in range(n_pixels):
         s = data[i, :]
         result = curve_fit(diffusion_model, b, s, initial_params)
