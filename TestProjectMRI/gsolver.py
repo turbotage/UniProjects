@@ -53,7 +53,7 @@ def _get_func(model,dependent):
 # START OF SOLVER
 
 def _get_jacobians(f, params):
-    JT = torch.autograd.functional.jacobian(f, params).transpose(0,2)
+    JT = torch.autograd.functional.jacobian(f, params, ).transpose(0,2)
     J = JT.transpose(1,2)
     return J, JT
 
@@ -65,13 +65,16 @@ def _get_step(J, JT, JT_diff, guess_order):
     # AX=B
     JTJ = torch.bmm(JT,J) # (JTJ)
     
-    ill_behaved = (torch.logical_or(torch.det(JTJ) < 1, torch.det(JTJ) > 1e30)).reshape(JTJ.size()[0],1,1)
+    #if (JTJ.size()[0] < 20):
+        #print(J)
+    
+    ill_behaved = (torch.logical_or(torch.det(JTJ) < 0.01, torch.det(JTJ) > 1e30)).reshape(JTJ.size()[0],1,1)
     
     eye = torch.eye(JTJ.size()[1]).repeat(JTJ.size()[0],1).reshape(JTJ.size()[0],JTJ.size()[1],JTJ.size()[1]).cuda()
     
     perturb = eye * guess_order * ill_behaved * 1e10
     
-    JTJ = JTJ *((ill_behaved * 1e-21) + torch.logical_not(ill_behaved)) + perturb
+    JTJ = JTJ *((ill_behaved * 0) + torch.logical_not(ill_behaved)) + perturb
     
     JT_diff = JT_diff * ((ill_behaved * 1e-21) + torch.logical_not(ill_behaved))
     
@@ -126,6 +129,10 @@ def solve(model, dependent, data, guess, guess_order, threshold = 0.0001, max_it
         diff = _get_diff(func,guess,data)
         JT_diff = torch.bmm(JT,diff)
         
+        #if (guess.size()[1] < 100):
+            #print(guess)
+            #print(func(guess))
+            
         
         old_step = step
         step = _get_step(J, JT, JT_diff, guess_order)
