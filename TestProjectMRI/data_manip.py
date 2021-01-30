@@ -10,7 +10,6 @@ import time
 
 import torch
 import matplotlib.pyplot as plt #for plotting
-
 from torchvision import datasets, transforms
 
 
@@ -59,7 +58,8 @@ if __name__ == "__main__":
     # Load the data
     imgs, b_vals = load_data("img_1.npz")
 
-    # If the signal is too low it is not the subject. It is only the background
+    # If the signal is too low it is not the subject.  It is only the
+    # background
     bg_threshold = 150
     mask = imgs[:, :, :, 0] > bg_threshold
     
