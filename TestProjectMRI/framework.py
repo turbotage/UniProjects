@@ -134,7 +134,7 @@ def vfa_model():
     # The data is now shaped as (92, 92, 25, 5). It is more convenient to have it on the shape (n_pixels x 5)
     # where n_pixels are the number of pixels in the mask.
     
-    initial_guess = [300,0.002]
+    initial_guess = [300,0.005]
     
     data = torch.from_numpy(project_to_vector(imgs, mask)).transpose(0,1).cuda()
     

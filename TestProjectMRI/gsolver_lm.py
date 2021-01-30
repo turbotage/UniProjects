@@ -78,21 +78,24 @@ class Model:
         JTJ = JTJ + perturb
         
         # Handle singularity, inf
-        ill_behaved = (torch.logical_or(torch.det(JTJ) < 0.1, torch.det(JTJ) > 1e25))
+        good_behaved = (torch.logical_and(torch.det(JTJ) > 0.1, torch.det(JTJ) < 1e25))
         
-        param_step = torch.zeros(JTJ.size()[1], JTJ.size()[0])
+        param_step = torch.zeros(JTJ.size()[1], JTJ.size()[0]).cuda()
         
-        JTJ_n = JTJ[ill_behaved, :, :]
-        JT_diff_n = JT_diff[ill_behaved, :, :]
-        print(JTJ_n.shape)
-        print(JT_diff_n.shape)
+        JTJ_n = JTJ[good_behaved]
+        JT_diff_n = JT_diff[good_behaved]
+        #print(JTJ_n.shape)
+        #print(JT_diff_n.shape)
         
         # Solve via Cholskey decomposition, should be better than LU for this problem
         u = torch.cholesky(JTJ_n)
-        print(torch.cholesky_solve(JT_diff_n,u).transpose(0,2)[0].shape)
-        param_step[ill_behaved,:] = torch.cholesky_solve(JT_diff_n,u).transpose(0,2)[0]
+        #print(torch.cholesky_solve(JT_diff_n,u).transpose(0,2)[0].shape)
+        #print(param_step.shape)
+        #print(good_behaved.shape)
         
-        return param_step, ill_behaved
+        param_step[:,good_behaved] = torch.cholesky_solve(JT_diff_n,u).transpose(0,2)[0]
+        
+        return param_step, torch.logical_not(good_behaved)
     
     def solve(self, threshold = 0.0001, max_iter=10000):
         
@@ -113,9 +116,6 @@ class Model:
         # Initial Step
         J, JT = self.__get_jacobians(f, guess)
         diff = self.__get_diff(func, guess, data)
-        print(J.shape)
-        print(JT.shape)
-        print(diff.shape)
         
         JT_diff = torch.bmm(JT, diff)
         JTJ = torch.bmm(JT,J)
@@ -123,9 +123,9 @@ class Model:
         
         old_S = torch.zeros(1,self.__npixels).cuda()
         S = (diff * diff).sum(dim=1).transpose(0,1)
-    
-        step1 = self.__get_step(JTJ, JT_diff, damping / mul)
-        step2 = self.__get_step(JTJ, JT_diff, damping)
+        
+        step1, ill_behaved1 = self.__get_step(JTJ, JT_diff, damping / mul)
+        step2, ill_behaved2 = self.__get_step(JTJ, JT_diff, damping)
         
         diff = self.__get_diff(func, guess + step1, data)
         S1 = (diff * diff).sum(dim=1).transpose(0,1)
@@ -133,13 +133,13 @@ class Model:
         diff = self.__get_diff(func, guess + step2, data)
         S2 = (diff * diff).sum(dim=1).transpose(0,1)
         
-        damping = damping * ((S1 < S) / mul + (S2 < S) + torch.logical_and((S1 >= S),(S2 >= S)) * mul)
+        damping = damping * ((S1 < S) / mul + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * mul)
         
         old_step = torch.zeros(self.__nparams, self.__npixels).cuda()
-        step = (S1 < S) * step1 + (S2 < S) * step2
+        step = (S1 <= S) * step1 + (S2 <= S) * step2
         
         converges = ((torch.abs((old_step - step) / guess) < threshold * 10).sum(dim=0) + (torch.abs((old_S - S) / S) < threshold) + (damping <= old_damping))[0,:]
-    
+        
         params = guess
         #print("initial step done")
         
@@ -156,9 +156,9 @@ class Model:
             
             old_S = S
             S = (diff * diff).sum(dim=1).transpose(0,1)
-        
-            step1 = self.__get_step(JTJ, JT_diff, damping / mul)
-            step2 = self.__get_step(JTJ, JT_diff, damping)
+            
+            step1, ill_behaved1 = self.__get_step(JTJ, JT_diff, damping / mul)
+            step2, ill_behaved2 = self.__get_step(JTJ, JT_diff, damping)
             
             diff = self.__get_diff(func, guess + step1, data)
             S1 = (diff * diff).sum(dim=1).transpose(0,1)
@@ -167,10 +167,10 @@ class Model:
             S2 = (diff * diff).sum(dim=1).transpose(0,1)
             
             old_damping = damping
-            damping = damping * ((S1 < S) / mul + (S2 < S) + torch.logical_and((S1 >= S),(S2 >= S)) * mul)
+            damping = damping * ((S1 < S) / mul + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * mul)
             
             old_step = step
-            step = (S1 < S) * step1 + (S2 < S) * step2
+            step = (S1 <= S) * step1 + (S2 <= S) * step2
             
             #print(damping.shape)
             #(old_damping.shape)
