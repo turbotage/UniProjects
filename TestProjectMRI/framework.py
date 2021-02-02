@@ -65,7 +65,7 @@ def exp_diffusion_model():
 	# The data is now shaped as (92, 92, 25, 5). It is more convenient to have it on the shape (n_pixels x 5)
 	# where n_pixels are the number of pixels in the mask.
 	
-	initial_guess = [2000,0.008]
+	initial_guess = [2000,0.01]
 	
 	data = torch.from_numpy(project_to_vector(imgs, mask)).transpose(0,1).cuda()
 	
@@ -80,7 +80,7 @@ def exp_diffusion_model():
 	
 	
 	
-	found_params, conv_perc, iterations = model.solve(0.001, 400)
+	found_params, conv_perc, iterations = model.solve(0.0001, 400)
 	
 	end = time.time()
 	

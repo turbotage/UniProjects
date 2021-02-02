@@ -111,7 +111,7 @@ class Model:
 		
 		damping = torch.ones(1,self.__npixels).cuda() * 1e3
 		old_damping = damping
-		mul = torch.ones(1,self.__npixels).cuda() * 1.3
+		mul = torch.ones(1,self.__npixels).cuda() * 1
 		
 		has_stepped = (torch.ones(1,self.__npixels) < 0).cuda()
 		
@@ -136,7 +136,7 @@ class Model:
 		diff = self.__get_diff(func, guess + step2, data)
 		S2 = (diff * diff).sum(dim=1).transpose(0,1)
 		
-		damping = damping * ((S1 < S) / mul + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * mul)
+		damping = damping * ((S1 < S) / 1.5 + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * 1.2)
 		
 		old_step = torch.zeros(self.__nparams, self.__npixels).cuda()
 		step = (S1 < S) * step1 + torch.logical_and(S1 >= S, S2 <= S) * step2
@@ -174,7 +174,7 @@ class Model:
 			S2 = (diff * diff).sum(dim=1).transpose(0,1)
 			
 			old_damping = damping
-			damping = damping * ((S1 < S) / mul + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * mul)
+			damping = damping * ((S1 < S) / 1.5 + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * 1.2)
 			
 			old_step = step
 			step = (S1 < S) * step1 + torch.logical_and(S1 >= S, S2 <= S) * step2
@@ -188,10 +188,10 @@ class Model:
 			
 			has_stepped = damping <= old_damping
 			
-			convergence_percentage = float(guess.size()[1] - (converges < 4).sum().cpu().numpy()) / float(guess.size()[1])
+			convergence_percentage = float(guess.size()[1] - (converges < (self.__nparams + 2)).sum().cpu().numpy()) / float(guess.size()[1])
 			
-			if convergence_percentage * self.__npixels > 5000 or convergence_percentage > 0.20:
-				not_converging = converges < 4
+			if convergence_percentage * self.__npixels > 5000 or convergence_percentage > 0.50:
+				not_converging = converges < (self.__nparams + 2)
 				converging = torch.logical_not(not_converging)
 				
 				# copy converging pixels
@@ -225,13 +225,16 @@ class Model:
 				non_convergence_list = non_convergence_list[not_converging]
 				
 				
-				print((1-float(self.__npixels - converges.sum().cpu().numpy()) / float(self.__npixels)) * float(self.__npixels))
+				#print((1-float(self.__npixels - converges.sum().cpu().numpy()) / float(self.__npixels)) * float(self.__npixels))
 				#print((ill_behaved1 + ill_behaved2).sum() )
+				
+				#if guess.size()[1] < 20:
+					#print(guess)
 		
 		
-		params[:,non_convergence_list[converges > 3]] = guess[:,converges > 3]
+		params[:,non_convergence_list[converges > (self.__nparams + 1)]] = guess[:,converges > (self.__nparams + 1)]
 		
-		convergence_percentage = float(self.__npixels - (converges < 4).sum().cpu().numpy()) / float(self.__npixels)
+		convergence_percentage = float(self.__npixels - (converges < (self.__nparams + 2)).sum().cpu().numpy()) / float(self.__npixels)
 		
 		return params, convergence_percentage, iteration
 

@@ -66,7 +66,7 @@ def fit_diffusion_data(b, data):
     params = np.zeros((n_pixels, 2))
     
     # Uniform initial guess for all pixels
-    initial_params = np.array([1000, 0.002])
+    initial_params = np.array([50, 0.0002])
     
     for i in range(n_pixels):
         s = data[i, :]
