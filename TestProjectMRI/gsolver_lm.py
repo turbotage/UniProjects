@@ -98,6 +98,8 @@ class Model:
 		return param_step, torch.logical_not(good_behaved)
 	
 	def solve(self, threshold = 0.0001, max_iter=10000):
+		uphil_step_mul = 1.2
+		downhill_step_mul = 1.5
 		
 		guess = self.__init_guess
 		data = self.__init_data
@@ -109,9 +111,9 @@ class Model:
 		
 		non_convergence_list = torch.arange(0,self.__npixels).cuda()
 		
-		damping = torch.ones(1,self.__npixels).cuda() * 1e3
+		damping = torch.ones(1,self.__npixels).cuda() * 1e6
 		old_damping = damping
-		mul = torch.ones(1,self.__npixels).cuda() * 1
+		#mul = torch.ones(1,self.__npixels).cuda() * 1
 		
 		has_stepped = (torch.ones(1,self.__npixels) < 0).cuda()
 		
@@ -127,7 +129,7 @@ class Model:
 		S = (diff * diff).sum(dim=1).transpose(0,1)
 		
 		#step0, ill_behaved0 = self.__get_step(JTJ, JT_diff, damping * 0)
-		step1, ill_behaved1 = self.__get_step(JTJ, JT_diff, damping / mul)
+		step1, ill_behaved1 = self.__get_step(JTJ, JT_diff, damping / downhill_step_mul)
 		step2, ill_behaved2 = self.__get_step(JTJ, JT_diff, damping)
 		
 		diff = self.__get_diff(func, guess + step1, data)
@@ -136,12 +138,12 @@ class Model:
 		diff = self.__get_diff(func, guess + step2, data)
 		S2 = (diff * diff).sum(dim=1).transpose(0,1)
 		
-		damping = damping * ((S1 < S) / 1.5 + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * 1.2)
+		damping = damping * ((S1 < S) / downhill_step_mul + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * uphil_step_mul)
 		
 		old_step = torch.zeros(self.__nparams, self.__npixels).cuda()
 		step = (S1 < S) * step1 + torch.logical_and(S1 >= S, S2 <= S) * step2
 		
-		converges = ((torch.abs((old_step - step) / guess) < (threshold / (1+damping))).sum(dim=0) + (torch.abs((old_S - S) / S) < (threshold / (1+damping))) + has_stepped)[0,:]
+		converges = ((torch.abs((old_step - step) / guess) < (threshold * 10 / (1+damping))).sum(dim=0) + (torch.abs((old_S - S) / S) < (threshold / (1+damping))) + has_stepped)[0,:]
 		
 		params = guess
 		#print("initial step done")
@@ -163,7 +165,7 @@ class Model:
 			S = (diff * diff).sum(dim=1).transpose(0,1)
 			
 			#step0, ill_behaved0 = self.__get_step(JTJ, JT_diff, damping * 0)
-			step1, ill_behaved1 = self.__get_step(JTJ, JT_diff, damping / mul)
+			step1, ill_behaved1 = self.__get_step(JTJ, JT_diff, damping / downhill_step_mul)
 			step2, ill_behaved2 = self.__get_step(JTJ, JT_diff, damping)
 			
 			
@@ -174,7 +176,7 @@ class Model:
 			S2 = (diff * diff).sum(dim=1).transpose(0,1)
 			
 			old_damping = damping
-			damping = damping * ((S1 < S) / 1.5 + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * 1.2)
+			damping = damping * ((S1 < S) / downhill_step_mul + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * uphil_step_mul)
 			
 			old_step = step
 			step = (S1 < S) * step1 + torch.logical_and(S1 >= S, S2 <= S) * step2
@@ -184,7 +186,7 @@ class Model:
 			
 			#print(damping.shape)
 			#(old_damping.shape)
-			converges = ((torch.abs((old_step - step) / guess) < (threshold / (1+damping))).sum(dim=0) + (torch.abs((old_S - S) / S) < (threshold / (1+damping))) + has_stepped)[0,:]
+			converges = ((torch.abs((old_step - step) / guess) < (threshold * 10 / (1+damping))).sum(dim=0) + (torch.abs((old_S - S) / S) < (threshold / (1+damping))) + has_stepped)[0,:]
 			
 			has_stepped = damping <= old_damping
 			
@@ -214,7 +216,7 @@ class Model:
 				
 				damping = damping[:,not_converging]
 				old_damping = old_damping[:,not_converging]
-				mul = mul[:,not_converging]
+				#mul = mul[:,not_converging]
 				
 				converges = converges[not_converging]
 				
@@ -226,6 +228,7 @@ class Model:
 				
 				
 				#print((1-float(self.__npixels - converges.sum().cpu().numpy()) / float(self.__npixels)) * float(self.__npixels))
+				#print(iteration)
 				#print((ill_behaved1 + ill_behaved2).sum() )
 				
 				#if guess.size()[1] < 20:

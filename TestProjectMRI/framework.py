@@ -16,7 +16,7 @@ import random
 
 import gsolver_lm
 
-		
+
 	   
 
 
@@ -65,7 +65,7 @@ def exp_diffusion_model():
 	# The data is now shaped as (92, 92, 25, 5). It is more convenient to have it on the shape (n_pixels x 5)
 	# where n_pixels are the number of pixels in the mask.
 	
-	initial_guess = [2000,0.01]
+	initial_guess = [300,0.002]
 	
 	data = torch.from_numpy(project_to_vector(imgs, mask)).transpose(0,1).cuda()
 	
@@ -80,7 +80,7 @@ def exp_diffusion_model():
 	
 	
 	
-	found_params, conv_perc, iterations = model.solve(0.0001, 400)
+	found_params, conv_perc, iterations = model.solve(0.001, 400)
 	
 	end = time.time()
 	
@@ -101,7 +101,7 @@ def exp_diffusion_model():
 	# parameters s0 and adc.
 	parameters = found_params.transpose(0,1).cpu().numpy()
 	parameters = project_to_image(parameters, mask)
-
+	
 	
 	# Plot
 	#fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
@@ -120,6 +120,8 @@ def exp_diffusion_model():
 	ax1.set_title("S0 [a.u.]")
 	ax2.set_title("ADC [x 10^-3 mm^2/s]")
 	plt.show()
+	
+	return found_params
 	
 
 
@@ -151,7 +153,7 @@ def vfa_model():
 	
 	start = time.time() 
 
-	found_params, conv_perc, iterations = gsolver_lm.solve(model, dependent, data, guess, guess_order, 0.0001, 300)
+	found_params, conv_perc, iterations = gsolver_lm.solve(model, dependent, data, guess, guess_order, 0.00001, 300)
 	
 	end = time.time()
 	
@@ -201,7 +203,8 @@ if __name__ == "__main__":
 	print()
 	
 	
-	exp_diffusion_model()
+	found_params = exp_diffusion_model()
+	print(torch.min(found_params))
 	
 	
 
