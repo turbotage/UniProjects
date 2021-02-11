@@ -59,118 +59,20 @@ class Model:
 	def __get_func(self, dependent):
 		return lambda params: self.__model(dependent, params)
 	
-	def __get_jacobians(self, f, params):
-		JT = torch.autograd.functional.jacobian(f, params).transpose(0,2)
+	def __get_jacobians(self, fun, params):
+		JT = torch.autograd.functional.jacobian(fun, params).transpose(0,2)
 		J = JT.transpose(1,2)
 		return J, JT
   
-	def __get_diff(self, func, params, data):
-		diff = (data - func(params)).transpose(0,1).reshape(data.size()[1], 1, data.size()[0]).transpose(1,2)
-		return diff
-  
-	def __get_step(self, JTJ, JT_diff, damping):
-		# AX=B
-		
-		eye = torch.eye(JTJ.size()[1]).repeat(JTJ.size()[0],1).reshape(JTJ.size()[0],JTJ.size()[1],JTJ.size()[1]).cuda()
-		
-		perturb = JTJ * eye * damping.reshape(JTJ.size()[0],1,1)
-		
-		JTJ = JTJ + perturb
-		
-		# Handle singularity, inf
-		good_behaved = (torch.logical_and(torch.det(JTJ) > 0.001, torch.det(JTJ) < 1e25))
-		
-		param_step = torch.zeros(JTJ.size()[1], JTJ.size()[0]).cuda()
-		
-		JTJ_n = JTJ[good_behaved]
-		JT_diff_n = JT_diff[good_behaved]
-		#print(JTJ_n.shape)
-		#print(JT_diff_n.shape)
-		
-		# Solve via Cholskey decomposition, should be better than LU for this problem
-		u = torch.cholesky(JTJ_n)
-		#print(torch.cholesky_solve(JT_diff_n,u).transpose(0,2)[0].shape)
-		#print(param_step.shape)
-		#print(good_behaved.shape)
-		
-		param_step[:,good_behaved] = torch.cholesky_solve(JT_diff_n,u).transpose(0,2)[0]
-		
-		return param_step, torch.logical_not(good_behaved)
+	def __get_residuals(self, func, params, data):
+		resT = (data - func(params)).transpose(0,1).reshape(data.size()[1], 1, data.size()[0])
+		res = resT.transpose(1,2)
+		return res, resT  
 	
-	def solve(self, threshold = 0.0001, max_iter=1000):
-		
-		
-		
-		guess = self.__init_guess
-		data = self.__init_data
-		dependent = self.__init_dependent
-		
-		func = self.__get_func(dependent)
-		f = lambda p: func(p).sum(dim=1)
-		
-		non_convergence_list = torch.arange(0,self.__npixels).cuda()
-		
-		
-		
-		
-		
-			"""
-			convergence_percentage = float(guess.size()[1] - (converges < (self.__nparams + 2)).sum().cpu().numpy()) / float(guess.size()[1])
-			
-			if convergence_percentage * self.__npixels > 5000 or convergence_percentage > 0.50:
-				not_converging = converges < (self.__nparams + 2)
-				converging = torch.logical_not(not_converging)
-				
-				# copy converging pixels
-				params[:,non_convergence_list[converging]] = guess[:,converging]
-				
-				
-				# rebuild solver to solve with non-converging pixels
-				
-				dependent = dependent[:,:,not_converging]
-				data = data[:,not_converging]
-				guess = guess[:,not_converging]
-				
-				step1 = step1[:,not_converging]
-				step2 = step2[:,not_converging]
-				step = step[:,not_converging]
-				
-				S1 = S1[:,not_converging]
-				S2 = S2[:,not_converging]
-				S = S[:,not_converging]
-				
-				damping = damping[:,not_converging]
-				old_damping = old_damping[:,not_converging]
-				#mul = mul[:,not_converging]
-				
-				converges = converges[not_converging]
-				
-				func = self.__get_func(dependent)
-				f = lambda p: func(p).sum(dim=1)
-				
-				# rebuild non convergence list
-				non_convergence_list = non_convergence_list[not_converging]
-				
-				
-				#print((1-float(self.__npixels - converges.sum().cpu().numpy()) / float(self.__npixels)) * float(self.__npixels))
-				#print(iteration)
-				#print((ill_behaved1 + ill_behaved2).sum() )
-				
-				#if guess.size()[1] < 20:
-					#print(guess)
-		
-		
-		params[:,non_convergence_list[converges > (self.__nparams + 1)]] = guess[:,converges > (self.__nparams + 1)]
-		
-		convergence_percentage = float(self.__npixels - (converges < (self.__nparams + 2)).sum().cpu().numpy()) / float(self.__npixels)
-		
-		return params, convergence_percentage, iteration
-	
-			"""
-	
-	def dogleg(res, J, JT, delta):
-		p = torch.zeros(self.__npixels, self.__nparams)
-		step = torch.zeros(self.__npixels, self.__nparams)
+	def __converges(self, Jp, res, tol):
+		return (torch.norm(Jp,dim=1) <= tol * torch.norm(res, dim=1))[:,0]
+	        
+	def __dogleg(self, res, J, delta):
 		
 		Jn2 = (J * J).sum(dim=1)
 		Jn = torch.sqrt(Jn2)
@@ -184,25 +86,130 @@ class Model:
 		gs = torch.bmm(JsT,res)
 		
 		u = torch.cholesky(Hs)
-		q = torch.cholesky_solve(gs,u)
+		q = torch.cholesky_solve(-gs,u)
 		
 		pGN = torch.bmm(D,q)
 		
-		case1 = torch.norm(pGN,dim=2) <= delta
-		p[case1] = 
+		p = torch.zeros(pGN.size()[0],pGN.size()[1],pGN.size()[2]).cuda()
+		step = torch.zeros(pGN.size()[0]).cuda()
+		
+		mask1 = torch.norm(pGN,dim=1)[:,0] <= delta
 		
 		
+		if mask1.sum() != 0:
+			p[mask1] = pGN[mask1]
+			step[mask1] = 0
 		
+		invD = torch.diag_embed(Jn)
+		invD2 = torch.diag_embed(Jn2)
 		
+		invD2gs = torch.bmm(invD2,gs)
+		invD2gsT = invD2gs.transpose(1,2)
 		
+		g = torch.bmm(invD,gs)
+		gT = g.transpose(1,2)
 		
-	def levenberg_marquardt_powell(self, delta0, mu, eta, threshold, max_iter):
+		lambdaStar = torch.bmm(gT,g) / (torch.bmm(invD2gsT,invD2gs))
 		
+		CP = -lambdaStar*g
 		
+		mask2 = torch.logical_and(torch.norm(CP,dim=1)[:,0] > delta, torch.logical_not(mask1))
+		if mask2.sum() != 0:
+			p[mask2] = -(g[mask2] / torch.norm(g[mask2],dim=1)[:,None]) * delta[mask2][:,None,None]
+			step[mask2] = 2
 		
-		
-		while True:
+		not_mask = torch.logical_not(torch.logical_or(mask1,mask2))
+		if not_mask.sum() != 0:
+			A = (CP[not_mask] - pGN[not_mask]).pow(2).sum(dim=1)
+			B = (2 * CP[not_mask] * (pGN[not_mask]-CP[not_mask])).sum(dim=1)
+			C = CP[not_mask].pow(2).sum(dim=1) - delta[not_mask].pow(2).reshape(delta[not_mask].size()[0],1)
 			
+			k = (-B + torch.sqrt(B**2-4*A*C)/(2*A)).reshape(C.size()[0],1,1)
+			
+			p[not_mask] = CP[not_mask] + k*(pGN[not_mask] - CP[not_mask])
+			step[not_mask] = 1
+		
+		return p, pGN, step
+		
+		
+		
+	def __levenberg_marquardt_powell(self, guess, data, dependent, delta, mu, eta, tol, max_iter):
+		
+		func = self.__get_func(dependent)
+		fun = lambda p: func(p).sum(dim=1)
+		
+		res, resT = self.__get_residuals(func, guess, data)
+		J, JT = self.__get_jacobians(fun, guess)
+		f = 0.5 * torch.bmm(resT,res)
+		
+		
+		#if True:
+		#	srJ = 
+		
+		conv_perc = 0
+		iteration = 0
+		while True:
+			p, pGN, step = self.__dogleg(res, J, delta)
+			
+			Jp = torch.bmm(J,p)
+			JpT = Jp.transpose(1,2)
+			
+			converges = torch.logical_and((step == 0), self.__converges(torch.bmm(J,pGN), res, tol))
+			
+			t = guess + p.transpose(0,2)[0]
+			rt, rtT = self.__get_residuals(func, t, data)
+			ft = 0.5 * torch.bmm(rtT, rt)
+			
+			predicted = -torch.bmm(rtT,Jp)-0.5*torch.bmm(JpT,Jp)
+			actual = f-ft
+			
+			rho = (actual / predicted).reshape(actual.size()[0])
+			
+			
+			mask = rho <= mu
+			not_mask = torch.logical_not(mask)
+			if mask.sum() != 0:
+				delta[mask] = 0.5 * delta[mask]
+			
+			pGN_Norm = torch.norm(pGN,dim=1)[:,0]
+			mask = torch.logical_and(mask, delta > pGN_Norm)
+			if mask.sum() != 0:
+				delta[mask] = delta[mask] / (2 ** torch.ceil(torch.log2(delta[mask] / pGN_Norm[mask])))
+			
+			if not_mask.sum() != 0:
+				print("changed guess: ", not_mask.sum())
+				guess[:,not_mask] = t[:,not_mask]
+			
+			mask = rho >= eta
+			if mask.sum() != 0:
+				delta[mask] = delta[mask] * 2
+			
+			
+			res, resT = self.__get_residuals(func, guess, data)
+			J, JT = self.__get_jacobians(fun, guess)
+			f = 0.5 * torch.bmm(resT,res)
+			
+			iteration += 1
+			if iteration >= max_iter or converges.sum() == self.__npixels:
+				conv_perc = float(converges.sum()) / float(self.__npixels)
+				break
+			
+		
+		return guess, conv_perc, iteration
+		
+	
+	def solve(self, tol = 0.0001, max_iter=1000):
+		guess = self.__init_guess
+		data = self.__init_data
+		dependent = self.__init_dependent
+		
+		delta0 = torch.norm(guess, dim=0)
+		mu = 0.25
+		eta = 0.75
+		
+		solution = self.__levenberg_marquardt_powell(guess, data, dependent, delta0, mu, eta, tol, max_iter)
+		
+		return solution
 		
 	
 	

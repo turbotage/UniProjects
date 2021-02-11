@@ -80,7 +80,7 @@ def exp_diffusion_model():
 	
 	
 	
-	found_params, conv_perc, iterations = model.solve(0.001, 400)
+	found_params, conv_perc, iterations = model.solve(0.001, 300)
 	
 	end = time.time()
 	
