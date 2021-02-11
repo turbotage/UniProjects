@@ -97,9 +97,9 @@ class Model:
 		
 		return param_step, torch.logical_not(good_behaved)
 	
-	def solve(self, threshold = 0.0001, max_iter=10000):
-		uphil_step_mul = 1.2
-		downhill_step_mul = 1.5
+	def solve(self, threshold = 0.0001, max_iter=1000):
+		
+		
 		
 		guess = self.__init_guess
 		data = self.__init_data
@@ -108,88 +108,13 @@ class Model:
 		func = self.__get_func(dependent)
 		f = lambda p: func(p).sum(dim=1)
 		
-		
 		non_convergence_list = torch.arange(0,self.__npixels).cuda()
 		
-		damping = torch.ones(1,self.__npixels).cuda() * 1e6
-		old_damping = damping
-		#mul = torch.ones(1,self.__npixels).cuda() * 1
-		
-		has_stepped = (torch.ones(1,self.__npixels) < 0).cuda()
-		
-		# Initial Step
-		J, JT = self.__get_jacobians(f, guess)
-		diff = self.__get_diff(func, guess, data)
-		
-		JT_diff = torch.bmm(JT, diff)
-		JTJ = torch.bmm(JT,J)
 		
 		
-		old_S = torch.zeros(1,self.__npixels).cuda()
-		S = (diff * diff).sum(dim=1).transpose(0,1)
 		
-		#step0, ill_behaved0 = self.__get_step(JTJ, JT_diff, damping * 0)
-		step1, ill_behaved1 = self.__get_step(JTJ, JT_diff, damping / downhill_step_mul)
-		step2, ill_behaved2 = self.__get_step(JTJ, JT_diff, damping)
 		
-		diff = self.__get_diff(func, guess + step1, data)
-		S1 = (diff * diff).sum(dim=1).transpose(0,1)
-		
-		diff = self.__get_diff(func, guess + step2, data)
-		S2 = (diff * diff).sum(dim=1).transpose(0,1)
-		
-		damping = damping * ((S1 < S) / downhill_step_mul + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * uphil_step_mul)
-		
-		old_step = torch.zeros(self.__nparams, self.__npixels).cuda()
-		step = (S1 < S) * step1 + torch.logical_and(S1 >= S, S2 <= S) * step2
-		
-		converges = ((torch.abs((old_step - step) / guess) < (threshold * 10 / (1+damping))).sum(dim=0) + (torch.abs((old_S - S) / S) < (threshold / (1+damping))) + has_stepped)[0,:]
-		
-		params = guess
-		#print("initial step done")
-		
-		iteration = 0
-		while (converges.sum() != guess.size()[1] * (guess.size()[0] + 2)) and iteration < max_iter:
-			iteration += 1
-			
-			has_stepped = damping <= old_damping
-			
-			guess = guess + step
-			
-			J, JT = self.__get_jacobians(f, guess)
-			diff = self.__get_diff(func, guess, data)
-			JT_diff = torch.bmm(JT, diff)
-			JTJ = torch.bmm(JT,J)
-			
-			old_S = S
-			S = (diff * diff).sum(dim=1).transpose(0,1)
-			
-			#step0, ill_behaved0 = self.__get_step(JTJ, JT_diff, damping * 0)
-			step1, ill_behaved1 = self.__get_step(JTJ, JT_diff, damping / downhill_step_mul)
-			step2, ill_behaved2 = self.__get_step(JTJ, JT_diff, damping)
-			
-			
-			diff = self.__get_diff(func, guess + step1, data)
-			S1 = (diff * diff).sum(dim=1).transpose(0,1)
-			
-			diff = self.__get_diff(func, guess + step2, data)
-			S2 = (diff * diff).sum(dim=1).transpose(0,1)
-			
-			old_damping = damping
-			damping = damping * ((S1 < S) / downhill_step_mul + torch.logical_and(S1 >= S, S2 <= S) + torch.logical_and(S1 >= S, S2 > S) * uphil_step_mul)
-			
-			old_step = step
-			step = (S1 < S) * step1 + torch.logical_and(S1 >= S, S2 <= S) * step2
-			
-			#if ( (damping < 0.1).sum() > 0):
-			#    print("Small damping")
-			
-			#print(damping.shape)
-			#(old_damping.shape)
-			converges = ((torch.abs((old_step - step) / guess) < (threshold * 10 / (1+damping))).sum(dim=0) + (torch.abs((old_S - S) / S) < (threshold / (1+damping))) + has_stepped)[0,:]
-			
-			has_stepped = damping <= old_damping
-			
+			"""
 			convergence_percentage = float(guess.size()[1] - (converges < (self.__nparams + 2)).sum().cpu().numpy()) / float(guess.size()[1])
 			
 			if convergence_percentage * self.__npixels > 5000 or convergence_percentage > 0.50:
@@ -240,7 +165,47 @@ class Model:
 		convergence_percentage = float(self.__npixels - (converges < (self.__nparams + 2)).sum().cpu().numpy()) / float(self.__npixels)
 		
 		return params, convergence_percentage, iteration
-
+	
+			"""
+	
+	def dogleg(res, J, JT, delta):
+		p = torch.zeros(self.__npixels, self.__nparams)
+		step = torch.zeros(self.__npixels, self.__nparams)
+		
+		Jn2 = (J * J).sum(dim=1)
+		Jn = torch.sqrt(Jn2)
+		
+		D = torch.diag_embed(1 / Jn)
+		
+		Js = torch.bmm(J,D)
+		JsT = Js.transpose(1,2)
+		
+		Hs = torch.bmm(JsT,Js)
+		gs = torch.bmm(JsT,res)
+		
+		u = torch.cholesky(Hs)
+		q = torch.cholesky_solve(gs,u)
+		
+		pGN = torch.bmm(D,q)
+		
+		case1 = torch.norm(pGN,dim=2) <= delta
+		p[case1] = 
+		
+		
+		
+		
+		
+		
+	def levenberg_marquardt_powell(self, delta0, mu, eta, threshold, max_iter):
+		
+		
+		
+		
+		while True:
+			
+		
+	
+	
 # END OF MODEL
 
 
