@@ -72,7 +72,7 @@ class Model:
 	def __converges(self, Jp, res, tol):
 		return (torch.norm(Jp,dim=1) <= tol * torch.norm(res, dim=1))[:,0]
 	        
-	def __dogleg(self, res, J, delta):
+	def __dogleg(self, res, J, JT, delta):
 		
 		Jn2 = (J * J).sum(dim=1)
 		Jn = torch.sqrt(Jn2)
@@ -88,14 +88,15 @@ class Model:
 		u = torch.cholesky(Hs)
 		q = torch.cholesky_solve(-gs,u)
 		
+		
+		
 		pGN = torch.bmm(D,q)
 		
 		p = torch.zeros(pGN.size()[0],pGN.size()[1],pGN.size()[2]).cuda()
 		step = torch.zeros(pGN.size()[0]).cuda()
 		
+		
 		mask1 = torch.norm(pGN,dim=1)[:,0] <= delta
-		
-		
 		if mask1.sum() != 0:
 			p[mask1] = pGN[mask1]
 			step[mask1] = 0
@@ -124,7 +125,7 @@ class Model:
 			B = (2 * CP[not_mask] * (pGN[not_mask]-CP[not_mask])).sum(dim=1)
 			C = CP[not_mask].pow(2).sum(dim=1) - delta[not_mask].pow(2).reshape(delta[not_mask].size()[0],1)
 			
-			k = (-B + torch.sqrt(B**2-4*A*C)/(2*A)).reshape(C.size()[0],1,1)
+			k = ((-B + torch.sqrt(B**2 - 4*A*C))/(2*A)).reshape(C.size()[0],1,1)
 			
 			p[not_mask] = CP[not_mask] + k*(pGN[not_mask] - CP[not_mask])
 			step[not_mask] = 1
@@ -149,7 +150,7 @@ class Model:
 		conv_perc = 0
 		iteration = 0
 		while True:
-			p, pGN, step = self.__dogleg(res, J, delta)
+			p, pGN, step = self.__dogleg(res, J, JT, delta)
 			
 			Jp = torch.bmm(J,p)
 			JpT = Jp.transpose(1,2)
@@ -170,11 +171,12 @@ class Model:
 			not_mask = torch.logical_not(mask)
 			if mask.sum() != 0:
 				delta[mask] = 0.5 * delta[mask]
+				
+				pGN_Norm = torch.norm(pGN,dim=1)[:,0]
+				mask = torch.logical_and(mask, delta > pGN_Norm)
+				if mask.sum() != 0:
+					delta[mask] = delta[mask] / (2 ** torch.ceil(torch.log2(delta[mask] / pGN_Norm[mask])))
 			
-			pGN_Norm = torch.norm(pGN,dim=1)[:,0]
-			mask = torch.logical_and(mask, delta > pGN_Norm)
-			if mask.sum() != 0:
-				delta[mask] = delta[mask] / (2 ** torch.ceil(torch.log2(delta[mask] / pGN_Norm[mask])))
 			
 			if not_mask.sum() != 0:
 				print("changed guess: ", not_mask.sum())
