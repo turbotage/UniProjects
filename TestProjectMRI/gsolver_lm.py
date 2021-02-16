@@ -60,12 +60,12 @@ class Model:
 		return lambda params: self.__model(dependent, params)
 	
 	def __get_jacobians(self, fun, params):
-		JT = torch.autograd.functional.jacobian(fun, params).transpose(0,2)
+		JT = -torch.autograd.functional.jacobian(fun, params).transpose(0,2)
 		J = JT.transpose(1,2)
 		return J, JT
   
 	def __get_residuals(self, func, params, data):
-		resT = (func(params) - data).transpose(0,1).reshape(data.size()[1], 1, data.size()[0])
+		resT = (data-func(params)).transpose(0,1).reshape(data.size()[1], 1, data.size()[0])
 		res = resT.transpose(1,2)
 		return res, resT  
 	
@@ -103,8 +103,8 @@ class Model:
 		
 		pGN = torch.bmm(D,q)
 		
-		p = torch.zeros(pGN.size()[0],pGN.size()[1],pGN.size()[2]).double().cuda()
-		step = torch.zeros(pGN.size()[0]).short().cuda()
+		p = torch.zeros(pGN.size()[0],pGN.size()[1],pGN.size()[2]).double()
+		step = torch.zeros(pGN.size()[0]).short()
 		
 		
 		mask = torch.norm(pGN,dim=1)[:,0] <= delta
@@ -122,6 +122,7 @@ class Model:
 		gT = g.transpose(1,2)
 		
 		lambdaStar = torch.bmm(gT,g) / (torch.bmm(invD2gsT,torch.bmm(Hs,invD2gs)))
+		
 		CP = -lambdaStar*g
 		
 		mask2 = torch.logical_and(torch.norm(CP,dim=1)[:,0] > delta, torch.logical_not(mask))
@@ -156,12 +157,12 @@ class Model:
 		f = 0.5 * torch.bmm(resT,res)
 		
 		
-		non_convergence_list = torch.arange(0,self.__npixels).long().cuda()
+		non_convergence_list = torch.arange(0,self.__npixels).long()
 		params = guess
 		
 		#if True:
 		#	srJ = 
-		oldp = torch.zeros(self.__nparams,self.__npixels).double().cuda()
+		oldp = torch.zeros(self.__nparams,self.__npixels).double()
 		
 		conv_perc = 0
 		iteration = 0
@@ -179,7 +180,7 @@ class Model:
 			rt, rtT = self.__get_residuals(func, t, data)
 			ft = 0.5 * torch.bmm(rtT, rt)
 			
-			predicted = -torch.bmm(rtT,Jp)-0.5*torch.bmm(JpT,Jp)
+			predicted = -torch.bmm(resT,Jp)-0.5*torch.bmm(JpT,Jp)
 			actual = f-ft
 			
 			rho = (actual / predicted).reshape(actual.size()[0])
@@ -208,14 +209,10 @@ class Model:
 			
 			converges = self.__converges(torch.bmm(J,pGN), res, oldRes, p.transpose(0,2)[0], oldp, guess, step, tol)
 			
-			iteration += 1
-			if iteration >= max_iter or converges.sum() == guess.size()[1]:
-				break
-			
 			
 			conv_perc = float(converges.sum()) / float(guess.size()[1]) * 100
-			print(conv_perc)
-			if (conv_perc * self.__npixels / 100 > 1000 or conv_perc > 0):
+			#print(conv_perc)
+			if (conv_perc * self.__npixels / 100 > 1000 or conv_perc > 2):
 				not_converging = torch.logical_not(converges)
 				
 				params[:,non_convergence_list[converges]] = guess[:,converges]
@@ -241,6 +238,18 @@ class Model:
 			J, JT = self.__get_jacobians(fun, guess)
 			f = 0.5 * torch.bmm(resT,res)
 			oldp = p.transpose(0,2)[0]
+			
+			
+			#stepStr = ['GN','IP','CP']
+			
+			#print("iter=", iteration, "rho=",float(rho[int(106403/2)]), "delta=",float(delta[int(106403/2)]),)
+			#print("step=", stepStr[step[int(106403/2)]], "param=", guess[:,int(106403/2)])
+			#print()
+			
+			
+			iteration += 1
+			if iteration > max_iter or converges.sum() == guess.size()[1]:
+				break
 			
 		
 		params[:,non_convergence_list[converges]] = guess[:,converges]
@@ -283,7 +292,7 @@ class Model:
 # PARAMETER GUESSING
 
 def get_uniform_guess(data,uniform_param_guess):
-	guess = torch.zeros(len(uniform_param_guess),data.size()[1]).double().cuda()
+	guess = torch.zeros(len(uniform_param_guess),data.size()[1]).double()
 	for i in range(len(uniform_param_guess)):
 		guess[i,:] = uniform_param_guess[i]
 		
