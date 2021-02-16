@@ -65,12 +65,24 @@ class Model:
 		return J, JT
   
 	def __get_residuals(self, func, params, data):
-		resT = (data - func(params)).transpose(0,1).reshape(data.size()[1], 1, data.size()[0])
+		resT = (func(params) - data).transpose(0,1).reshape(data.size()[1], 1, data.size()[0])
 		res = resT.transpose(1,2)
 		return res, resT  
 	
-	def __converges(self, Jp, res, tol):
-		return (torch.norm(Jp,dim=1) <= tol * torch.norm(res, dim=1))[:,0]
+	def __converges(self, Jp, res, oldRes, p, oldp, guess, step, tol):
+		#return torch.logical_and((step == 0), (torch.norm(Jp,dim=1) <= tol * torch.norm(res, dim=1))[:,0])
+		step_convergence = (torch.abs((p-oldp) / guess) < tol).sum(dim=0) == self.__nparams
+		R = (res * res).sum(dim=1)
+		OR = (oldRes * oldRes).sum(dim=1)
+		error_convergence = (torch.abs((OR - R) / (R * R)).reshape(R.size()[0])  < tol)
+		plane_convergence = torch.norm(Jp,dim=1) <= tol * torch.norm(res, dim=1)
+		
+		C1 = torch.logical_and(step_convergence, error_convergence)
+		C2 = torch.logical_and(step == 0, plane_convergence)
+		
+		return torch.logical_and(C1, C2)
+		
+		#return (torch.abs(res - oldRes) < tol)
 	        
 	def __dogleg(self, res, J, JT, delta):
 		
@@ -89,17 +101,16 @@ class Model:
 		q = torch.cholesky_solve(-gs,u)
 		
 		
-		
 		pGN = torch.bmm(D,q)
 		
-		p = torch.zeros(pGN.size()[0],pGN.size()[1],pGN.size()[2]).cuda()
-		step = torch.zeros(pGN.size()[0]).cuda()
+		p = torch.zeros(pGN.size()[0],pGN.size()[1],pGN.size()[2]).double().cuda()
+		step = torch.zeros(pGN.size()[0]).short().cuda()
 		
 		
-		mask1 = torch.norm(pGN,dim=1)[:,0] <= delta
-		if mask1.sum() != 0:
-			p[mask1] = pGN[mask1]
-			step[mask1] = 0
+		mask = torch.norm(pGN,dim=1)[:,0] <= delta
+		if mask.sum() != 0:
+			p[mask] = pGN[mask]
+			step[mask] = 0
 		
 		invD = torch.diag_embed(Jn)
 		invD2 = torch.diag_embed(Jn2)
@@ -110,25 +121,24 @@ class Model:
 		g = torch.bmm(invD,gs)
 		gT = g.transpose(1,2)
 		
-		lambdaStar = torch.bmm(gT,g) / (torch.bmm(invD2gsT,invD2gs))
-		
+		lambdaStar = torch.bmm(gT,g) / (torch.bmm(invD2gsT,torch.bmm(Hs,invD2gs)))
 		CP = -lambdaStar*g
 		
-		mask2 = torch.logical_and(torch.norm(CP,dim=1)[:,0] > delta, torch.logical_not(mask1))
+		mask2 = torch.logical_and(torch.norm(CP,dim=1)[:,0] > delta, torch.logical_not(mask))
 		if mask2.sum() != 0:
 			p[mask2] = -(g[mask2] / torch.norm(g[mask2],dim=1)[:,None]) * delta[mask2][:,None,None]
 			step[mask2] = 2
 		
-		not_mask = torch.logical_not(torch.logical_or(mask1,mask2))
-		if not_mask.sum() != 0:
-			A = (CP[not_mask] - pGN[not_mask]).pow(2).sum(dim=1)
-			B = (2 * CP[not_mask] * (pGN[not_mask]-CP[not_mask])).sum(dim=1)
-			C = CP[not_mask].pow(2).sum(dim=1) - delta[not_mask].pow(2).reshape(delta[not_mask].size()[0],1)
+		mask = torch.logical_not(torch.logical_or(mask,mask2))
+		if mask.sum() != 0:
+			A = ((CP[mask] - pGN[mask]).pow(2)).sum(dim=1)
+			B = (2 * CP[mask] * (pGN[mask]-CP[mask])).sum(dim=1)
+			C = (CP[mask].pow(2)).sum(dim=1) - (delta[mask].pow(2)).reshape(delta[mask].size()[0],1)
 			
 			k = ((-B + torch.sqrt(B**2 - 4*A*C))/(2*A)).reshape(C.size()[0],1,1)
 			
-			p[not_mask] = CP[not_mask] + k*(pGN[not_mask] - CP[not_mask])
-			step[not_mask] = 1
+			p[mask] = CP[mask] + k*(pGN[mask] - CP[mask])
+			step[mask] = 1
 		
 		return p, pGN, step
 		
@@ -140,12 +150,18 @@ class Model:
 		fun = lambda p: func(p).sum(dim=1)
 		
 		res, resT = self.__get_residuals(func, guess, data)
+		oldRes = res * 0
+		
 		J, JT = self.__get_jacobians(fun, guess)
 		f = 0.5 * torch.bmm(resT,res)
 		
 		
+		non_convergence_list = torch.arange(0,self.__npixels).long().cuda()
+		params = guess
+		
 		#if True:
 		#	srJ = 
+		oldp = torch.zeros(self.__nparams,self.__npixels).double().cuda()
 		
 		conv_perc = 0
 		iteration = 0
@@ -155,7 +171,9 @@ class Model:
 			Jp = torch.bmm(J,p)
 			JpT = Jp.transpose(1,2)
 			
-			converges = torch.logical_and((step == 0), self.__converges(torch.bmm(J,pGN), res, tol))
+			
+			# We didn't converge keep trying
+			
 			
 			t = guess + p.transpose(0,2)[0]
 			rt, rtT = self.__get_residuals(func, t, data)
@@ -179,7 +197,7 @@ class Model:
 			
 			
 			if not_mask.sum() != 0:
-				print("changed guess: ", not_mask.sum())
+				#print("changed guess: ", not_mask.sum())
 				guess[:,not_mask] = t[:,not_mask]
 			
 			mask = rho >= eta
@@ -187,17 +205,50 @@ class Model:
 				delta[mask] = delta[mask] * 2
 			
 			
+			
+			converges = self.__converges(torch.bmm(J,pGN), res, oldRes, p.transpose(0,2)[0], oldp, guess, step, tol)
+			
+			iteration += 1
+			if iteration >= max_iter or converges.sum() == guess.size()[1]:
+				break
+			
+			
+			conv_perc = float(converges.sum()) / float(guess.size()[1]) * 100
+			print(conv_perc)
+			if (conv_perc * self.__npixels / 100 > 1000 or conv_perc > 0):
+				not_converging = torch.logical_not(converges)
+				
+				params[:,non_convergence_list[converges]] = guess[:,converges]
+				
+				dependent = dependent[:,:,not_converging]
+				data = data[:,not_converging]
+				guess = guess[:,not_converging]
+				
+				delta = delta[not_converging]
+				
+				res = res[not_converging]
+				p = p[not_converging]
+				
+				func = self.__get_func(dependent)
+				f = lambda p: func(p).sum(dim=1)
+				
+				non_convergence_list = non_convergence_list[not_converging]
+			
+			
+			
+			oldRes = res
 			res, resT = self.__get_residuals(func, guess, data)
 			J, JT = self.__get_jacobians(fun, guess)
 			f = 0.5 * torch.bmm(resT,res)
-			
-			iteration += 1
-			if iteration >= max_iter or converges.sum() == self.__npixels:
-				conv_perc = float(converges.sum()) / float(self.__npixels)
-				break
+			oldp = p.transpose(0,2)[0]
 			
 		
-		return guess, conv_perc, iteration
+		params[:,non_convergence_list[converges]] = guess[:,converges]
+		
+		conv_perc = 100 * float(self.__npixels - non_convergence_list.size()[0]) / float(self.__npixels)
+		#conv_perc = 100 * float(self.__npixels - (self.__npixels - converges.sum())) / float(self.__npixels)
+		
+		return params, conv_perc, iteration
 		
 	
 	def solve(self, tol = 0.0001, max_iter=1000):
@@ -229,7 +280,7 @@ class Model:
 # PARAMETER GUESSING
 
 def get_uniform_guess(data,uniform_param_guess):
-	guess = torch.zeros(len(uniform_param_guess),data.size()[1]).cuda()
+	guess = torch.zeros(len(uniform_param_guess),data.size()[1]).double().cuda()
 	for i in range(len(uniform_param_guess)):
 		guess[i,:] = uniform_param_guess[i]
 		

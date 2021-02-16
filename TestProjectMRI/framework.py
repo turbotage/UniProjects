@@ -57,7 +57,8 @@ def project_to_image(vector: np.ndarray, mask_image: np.ndarray) -> np.ndarray:
 def exp_diffusion_model():
 	# Load the data
 	imgs, b_vals = load_data("img_1.npz")
-
+	b_vals = b_vals
+	
 	# If the signal is too low it is not the subject. It is only the background
 	bg_threshold = 150
 	mask = imgs[:, :, :, 0] > bg_threshold
@@ -65,32 +66,34 @@ def exp_diffusion_model():
 	# The data is now shaped as (92, 92, 25, 5). It is more convenient to have it on the shape (n_pixels x 5)
 	# where n_pixels are the number of pixels in the mask.
 	
-	initial_guess = [300,0.002]
+	initial_guess = [800,0.008]
 	
-	data = torch.from_numpy(project_to_vector(imgs, mask)).transpose(0,1).cuda()
+	data = torch.from_numpy(project_to_vector(imgs, mask)).transpose(0,1).double().cuda()
 	
 	guess = gsolver_lm.get_uniform_guess(data, initial_guess)
 	
-	dependent = torch.from_numpy(b_vals).repeat(data.size()[1],1).transpose(0,1).reshape(1, data.size()[0], data.size()[1]).cuda()
+	dependent = torch.from_numpy(b_vals).repeat(data.size()[1],1).transpose(0,1).reshape(1, data.size()[0], data.size()[1]).double().cuda()
 	
 	model_expr = "P0 * exp(-abs(X0 * P1))"
 	model = gsolver_lm.Model(model_expr, dependent, data, guess)
 	
-	start = time.time() 
+	start = time.time()
 	
 	
 	
-	found_params, conv_perc, iterations = model.solve(0.001, 300)
+	found_params, conv_perc, iterations = model.solve(0.001, 180)
+	found_params[1,:] = found_params[1,:]
 	
 	end = time.time()
 	
 	time_elapsed = end - start
-
+	
+	
 	print(time_elapsed, "s")
 	print()
 	
 	
-	print(conv_perc * 100, "% of pixels converges")
+	print(conv_perc, "% of pixels converges")
 	print()
 	
 	print("Number of iterations:", iterations)
@@ -138,22 +141,22 @@ def vfa_model():
 	
 	initial_guess = [1,1]
 	
-	data = torch.from_numpy(project_to_vector(imgs, mask)).transpose(0,1).cuda()
+	data = torch.from_numpy(project_to_vector(imgs, mask)).transpose(0,1).double().cuda()
 	
 	guess = gsolver_lm.get_uniform_guess(data, initial_guess)
 	
-	dependent = torch.zeros(2, data.size()[0], data.size()[1]).cuda()
+	dependent = torch.zeros(2, data.size()[0], data.size()[1]).double().cuda()
 	
 	
 	
 	model_expr = "P0 * exp(-X0 * P1)"
 	model = gsolver_lm.get_model(model_expr)
 	
-	guess_order = torch.diag(torch.tensor(initial_guess)).cuda()
+	guess_order = torch.diag(torch.tensor(initial_guess)).double().cuda()
 	
 	start = time.time() 
 
-	found_params, conv_perc, iterations = gsolver_lm.solve(model, dependent, data, guess, guess_order, 0.00001, 300)
+	found_params, conv_perc, iterations = gsolver_lm.solve(model, dependent, data, guess, guess_order, 0.001, 300)
 	
 	end = time.time()
 	
@@ -193,7 +196,6 @@ def vfa_model():
 	ax1.set_title("S0 [a.u.]")
 	ax2.set_title("ADC [x 10^-3 mm^2/s]")
 	plt.show()
-	
 
 
 if __name__ == "__main__":
