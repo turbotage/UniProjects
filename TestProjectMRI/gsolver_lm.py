@@ -74,8 +74,8 @@ class Model:
 		step_convergence = (torch.abs((p-oldp) / guess) < tol).sum(dim=0) == self.__nparams
 		R = (res * res).sum(dim=1)
 		OR = (oldRes * oldRes).sum(dim=1)
-		error_convergence = (torch.abs((OR - R) / (R * R)).reshape(R.size()[0])  < tol)
-		plane_convergence = torch.norm(Jp,dim=1) <= tol * torch.norm(res, dim=1)
+		error_convergence = (torch.abs((OR - R) / R).reshape(R.size()[0]) < tol)
+		plane_convergence = (torch.norm(Jp,dim=1) <= tol * torch.norm(res, dim=1)).reshape(R.size()[0])
 		
 		C1 = torch.logical_and(step_convergence, error_convergence)
 		C2 = torch.logical_and(step == 0, plane_convergence)
@@ -250,6 +250,9 @@ class Model:
 		
 		return params, conv_perc, iteration
 		
+	def levenberg_marquardt_algebraic():
+		return 2
+	
 	
 	def solve(self, tol = 0.0001, max_iter=1000):
 		guess = self.__init_guess

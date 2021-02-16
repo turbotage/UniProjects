@@ -81,7 +81,7 @@ def exp_diffusion_model():
 	
 	
 	
-	found_params, conv_perc, iterations = model.solve(0.001, 180)
+	found_params, conv_perc, iterations = model.solve(0.0001, 180)
 	found_params[1,:] = found_params[1,:]
 	
 	end = time.time()
@@ -118,7 +118,7 @@ def exp_diffusion_model():
 	fig, (ax1, ax2) = plt.subplots(1, 2)
 	im1 = ax1.imshow(parameters[:, :, 13, 0], vmin=0, vmax=1000)
 	fig.colorbar(im1, ax=ax1, orientation='horizontal')
-	im2 = ax2.imshow(1000 * parameters[:, :, 13, 1], vmin=0, vmax=4)
+	im2 = ax2.imshow(1000 * np.abs(parameters[:, :, 13, 1]), vmin=0, vmax=4)
 	fig.colorbar(im2, ax=ax2, orientation='horizontal')
 	ax1.set_title("S0 [a.u.]")
 	ax2.set_title("ADC [x 10^-3 mm^2/s]")
@@ -207,7 +207,7 @@ if __name__ == "__main__":
 	
 	found_params = exp_diffusion_model()
 	print(torch.min(found_params))
-	
+	print(torch.argmin(found_params))
 	
 
 
