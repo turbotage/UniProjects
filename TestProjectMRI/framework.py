@@ -66,7 +66,7 @@ def exp_diffusion_model():
 	# The data is now shaped as (92, 92, 25, 5). It is more convenient to have it on the shape (n_pixels x 5)
 	# where n_pixels are the number of pixels in the mask.
 	
-	initial_guess = [1200,0.002]
+	initial_guess = [300,0.002]
 	
 	data = torch.from_numpy(project_to_vector(imgs, mask)).transpose(0,1).double()
 	
@@ -74,14 +74,14 @@ def exp_diffusion_model():
 	
 	dependent = torch.from_numpy(b_vals).repeat(data.size()[1],1).transpose(0,1).reshape(1, data.size()[0], data.size()[1]).double()
 	
-	model_expr = "P0 * exp(-abs(X0 * P1))"
+	model_expr = "P0 * exp(-X0 * P1)"
 	model = gsolver_lm.Model(model_expr, dependent, data, guess)
 	
 	start = time.time()
 	
 	
 	
-	found_params, conv_perc, iterations = model.solve(0.0001, 300)
+	found_params, conv_perc, iterations = model.solve(100000, 0.001, 400)
 	found_params[1,:] = found_params[1,:]
 	
 	end = time.time()
@@ -158,7 +158,7 @@ def vfa_model():
 	
 	start = time.time() 
 
-	found_params, conv_perc, iterations = gsolver_lm.solve(model, dependent, data, guess, guess_order, 0.001, 300)
+	found_params, conv_perc, iterations = gsolver_lm.solve(0.001, 300)
 	
 	end = time.time()
 	

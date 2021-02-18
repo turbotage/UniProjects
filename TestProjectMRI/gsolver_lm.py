@@ -6,6 +6,7 @@ Created on Thu Jan 28 16:34:50 2021
 """
 
 import torch
+import numpy as np
 
 
 class Model:
@@ -20,6 +21,8 @@ class Model:
 		self.__init_dependent = dependent
 		self.__init_data = data
 		self.__init_guess = init_guess
+		
+		self.__solution = init_guess
 		
 		
 	def __get_model(self, model_expr):
@@ -78,7 +81,7 @@ class Model:
 		plane_convergence = (torch.norm(Jp,dim=1) <= tol * torch.norm(res, dim=1)).reshape(R.size()[0])
 		
 		C1 = torch.logical_and(step_convergence, error_convergence)
-		C2 = torch.logical_and(step == 0, plane_convergence)
+		C2 = torch.logical_and(step != 0, plane_convergence)
 		
 		return torch.logical_and(C1, C2)
 		
@@ -110,7 +113,7 @@ class Model:
 		mask = torch.norm(pGN,dim=1)[:,0] <= delta
 		if mask.sum() != 0:
 			p[mask] = pGN[mask]
-			step[mask] = 0
+			step[mask] = 1
 		
 		invD = torch.diag_embed(Jn)
 		invD2 = torch.diag_embed(Jn2)
@@ -128,7 +131,7 @@ class Model:
 		mask2 = torch.logical_and(torch.norm(CP,dim=1)[:,0] > delta, torch.logical_not(mask))
 		if mask2.sum() != 0:
 			p[mask2] = -(g[mask2] / torch.norm(g[mask2],dim=1)[:,None]) * delta[mask2][:,None,None]
-			step[mask2] = 2
+			step[mask2] = 3
 		
 		mask = torch.logical_not(torch.logical_or(mask,mask2))
 		if mask.sum() != 0:
@@ -139,13 +142,17 @@ class Model:
 			k = ((-B + torch.sqrt(B**2 - 4*A*C))/(2*A)).reshape(C.size()[0],1,1)
 			
 			p[mask] = CP[mask] + k*(pGN[mask] - CP[mask])
-			step[mask] = 1
+			step[mask] = 2
 		
 		return p, pGN, step
 		
 		
 		
 	def __levenberg_marquardt_powell(self, guess, data, dependent, delta, mu, eta, tol, max_iter):
+		
+		nparams = guess.size()[0]
+		npixels = guess.size()[1]
+		
 		
 		func = self.__get_func(dependent)
 		fun = lambda p: func(p).sum(dim=1)
@@ -157,12 +164,12 @@ class Model:
 		f = 0.5 * torch.bmm(resT,res)
 		
 		
-		non_convergence_list = torch.arange(0,self.__npixels).long()
+		non_convergence_list = torch.arange(0,npixels).long()
 		params = guess
 		
 		#if True:
 		#	srJ = 
-		oldp = torch.zeros(self.__nparams,self.__npixels).double()
+		oldp = torch.zeros(nparams, npixels).double()
 		
 		conv_perc = 0
 		iteration = 0
@@ -190,12 +197,13 @@ class Model:
 			not_mask = torch.logical_not(mask)
 			if mask.sum() != 0:
 				delta[mask] = 0.5 * delta[mask]
+				step[mask] = 0
 				
 				pGN_Norm = torch.norm(pGN,dim=1)[:,0]
 				mask = torch.logical_and(mask, delta > pGN_Norm)
 				if mask.sum() != 0:
 					delta[mask] = delta[mask] / (2 ** torch.ceil(torch.log2(delta[mask] / pGN_Norm[mask])))
-			
+				
 			
 			if not_mask.sum() != 0:
 				#print("changed guess: ", not_mask.sum())
@@ -211,8 +219,15 @@ class Model:
 			
 			
 			conv_perc = float(converges.sum()) / float(guess.size()[1]) * 100
+			
+			
+			iteration += 1
+			if iteration > max_iter or converges.sum() == guess.size()[1]:
+				break
+			
+			
 			#print(conv_perc)
-			if (conv_perc * self.__npixels / 100 > 1000 or conv_perc > 2):
+			if (conv_perc * npixels / 100 > 1000 or conv_perc > 2):
 				not_converging = torch.logical_not(converges)
 				
 				params[:,non_convergence_list[converges]] = guess[:,converges]
@@ -233,6 +248,7 @@ class Model:
 			
 			
 			
+			
 			oldRes = res
 			res, resT = self.__get_residuals(func, guess, data)
 			J, JT = self.__get_jacobians(fun, guess)
@@ -247,34 +263,45 @@ class Model:
 			#print()
 			
 			
-			iteration += 1
-			if iteration > max_iter or converges.sum() == guess.size()[1]:
-				break
 			
-		
+		print(non_convergence_list.shape)
+		print(converges.shape)
+			
 		params[:,non_convergence_list[converges]] = guess[:,converges]
 		
-		conv_perc = 100 * float(self.__npixels - non_convergence_list.size()[0]) / float(self.__npixels)
+		pixels_converging = int(npixels - non_convergence_list.size()[0])
 		#conv_perc = 100 * float(self.__npixels - (self.__npixels - converges.sum())) / float(self.__npixels)
 		
-		return params, conv_perc, iteration
+		return params, pixels_converging, iteration
 		
-	def levenberg_marquardt_algebraic():
-		return 2
 	
 	
-	def solve(self, tol = 0.0001, max_iter=1000):
-		guess = self.__init_guess
-		data = self.__init_data
-		dependent = self.__init_dependent
+	def solve(self, batch_size = 100000, tol = 0.0001, max_iter=1000):
 		
-		delta0 = torch.norm(guess, dim=0)
+		batch_its = int(np.ceil(self.__npixels / batch_size))
+		
 		mu = 0.25
 		eta = 0.75
 		
-		solution = self.__levenberg_marquardt_powell(guess, data, dependent, delta0, mu, eta, tol, max_iter)
+		pixels_converging = 0
+		iters = 0
+		for i in range(0,batch_its):
+			
+			
+			batch_guess = self.__init_guess[:,batch_size*i:batch_size*(i+1)]
+			batch_data = self.__init_data[:,batch_size*i:batch_size*(i+1)]
+			batch_dependent = self.__init_dependent[:,:,batch_size*i:batch_size*(i+1)]
+			
+			batch_delta0 = torch.norm(batch_guess, dim=0)
+			
+			self.__solution[batch_size*i:batch_size*(i+1)], pc, it = self.__levenberg_marquardt_powell(
+				batch_guess, batch_data, batch_dependent, batch_delta0, mu, eta, tol, max_iter)
+			   
+			pixels_converging += pc
+			iters += it
 		
-		return solution
+		
+		return self.__solution, 100 * pixels_converging / self.__npixels, iters / batch_its
 		
 	
 	
